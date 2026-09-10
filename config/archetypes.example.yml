@@ -48,9 +48,19 @@ archetypes:
     label: "AI Engineer"
     tex: "tex/ai_engineer.tex"
     keywords: ["LLM", "RAG", "evaluation", "fine-tuning", "inference"]
-    # A judgment-heavy archetype can be worth a stronger model. This is opt-in
-    # and per-archetype — bulk triage should stay on your cheap tier.
-    # model: "claude-fable-5-1"
+    # OPT-IN model routing. A judgment-heavy archetype can be worth a stronger
+    # model; bulk triage should stay on your cheap tier. Omit the key entirely
+    # and runs use your CLI's own default, which is what happens today.
+    #
+    # The value is passed straight through to the CLI's --model flag and is
+    # never interpreted here, so any id your CLI accepts works. It does NOT
+    # change what a run is permitted to do: tool permissions ride on the run
+    # kind, never on the model.
+    #
+    # Currently applied on the Claude path only. The other CLIs each spell their
+    # model flag differently, and guessing wrong sends the run to a model that
+    # does not exist.
+    # model: "<a model id your CLI accepts>"
 
   - id: data_engineer
     label: "Data Engineer"
