@@ -43,11 +43,29 @@ function readRegistry(): ReturnType<typeof normalizeRoots> {
   }
 }
 
-const fsQueries = {
-  exists: (p: string) => fs.existsSync(p),
-  isDir: (p: string) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } },
-  resolve: (...a: string[]) => path.resolve(...a),
-};
+/**
+ * Filesystem queries for root validation, with the resolution base pinned to
+ * the CHECKOUT.
+ *
+ * This exists because `path.resolve` alone is wrong here. The web server runs
+ * with `cwd = <checkout>/web`, so a bare `path.resolve(".")` yields `web/` and
+ * `path.resolve("../data")` yields `<checkout>/data` instead of the sibling of
+ * the checkout. config/roots.example.yml promises paths are "relative to THIS
+ * CHECKOUT (not to web/)", and this is what keeps that promise.
+ *
+ * It is the same resolution-base bug fixed in data-root.mjs for the marker
+ * file, reappearing one layer up: every path this app reads from user config
+ * must resolve against the checkout, never against the process cwd.
+ *
+ * Absolute paths are unaffected: path.resolve returns an absolute input as-is.
+ */
+export function rootFsQueries(coreRoot: string) {
+  return {
+    exists: (p: string) => fs.existsSync(p),
+    isDir: (p: string) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } },
+    resolve: (...a: string[]) => path.resolve(coreRoot, ...a),
+  };
+}
 
 /** Resolve the active profile for THIS request from its cookies. */
 export async function resolveProfileFromRequest(): Promise<ActiveProfileShape> {
@@ -60,8 +78,8 @@ export async function resolveProfileFromRequest(): Promise<ActiveProfileShape> {
     roots,
     requested,
     defaultCareerOpsRoot(),
-    (r) => checkRoot(r, fsQueries),
-    (...a: string[]) => path.resolve(...a),
+    (r) => checkRoot(r, rootFsQueries(defaultCareerOpsRoot())),
+    (...a: string[]) => path.resolve(defaultCareerOpsRoot(), ...a),
   );
 
   return {
