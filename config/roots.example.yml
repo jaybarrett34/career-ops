@@ -1,0 +1,73 @@
+# Career-Ops — Root Registry (multi-profile, layer 1 of 2)
+#
+# Copy to config/roots.yml and edit. config/roots.yml is GITIGNORED; this
+# example is the only version that ships.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# WHAT A ROOT IS
+#
+# A root is ONE PERSON's complete career-ops data root — their cv.md,
+# config/profile.yml, data/applications.md, reports/, portals.yml. Switching
+# roots switches all of it, so no row from one person's search can appear in
+# another's.
+#
+# This is layer 1. Layer 2 is config/archetypes.yml, which overlays targeting
+# and CV *within* one person. The two are independent: you pick a person, then
+# a flavor of that person.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# THIS FILE IS HAND-EDITED. THE APP NEVER WRITES TO IT.
+#
+# That is a security property, not an oversight. The registry is the only source
+# of selectable paths, and the UI selects by `id` and never by path — so no
+# request can name a directory that is not listed here. An "Add root" button
+# would hand that power back to whatever can send a request. Adding a root is a
+# deliberate act of editing this file.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# KEEPING YOUR PROFILES UNDER VERSION CONTROL (without publishing them)
+#
+# config/roots.yml is gitignored because it maps real people to real paths, and
+# this checkout may have a public remote. But you should still keep history.
+#
+# The intended pattern — and what the .career-ops-data marker exists for — is to
+# keep each person's DATA in its own private repository, and point at it:
+#
+#     ~/Projects/career-ops/          ← this checkout. public fork. code only.
+#     ~/Projects/my-career-data/      ← PRIVATE repo. cv.md, data/, reports/.
+#     ~/Projects/family-career-data/  ← PRIVATE repo. someone else's search.
+#
+# Each data repo is a normal git repo you commit to as often as you like, with
+# full history per profile, and it never touches the public remote. The code
+# checkout stays clean and pullable.
+#
+# Single-person setups need none of this: with no config/roots.yml the app uses
+# this checkout as the data root and hides the switcher entirely.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+
+roots:
+  # id     — letters, digits, - and _ (max 64). Used in URLs and cookies. Never
+  #          used to build a filesystem path.
+  # label  — what you see in the switcher. Free text.
+  # path   — absolute, or relative to THIS CHECKOUT (not to web/). Must contain
+  #          cv.md or config/profile.yml, or it is refused: an empty directory
+  #          would present as a career-ops install with no data, which is
+  #          indistinguishable from data loss.
+  # enabled— optional, defaults to true. Set false to keep an entry without
+  #          offering it.
+
+  - id: me
+    label: "My search"
+    path: "~/Projects/my-career-data"
+
+  # A second person. Their tracker, reports and CV are entirely separate.
+  # - id: family
+  #   label: "Mom's search"
+  #   path: "~/Projects/family-career-data"
+
+  # Relative paths resolve against this checkout, matching path-resolver.mjs.
+  # - id: archive
+  #   label: "2025 search (archive)"
+  #   path: "../career-data-2025"
+  #   enabled: false

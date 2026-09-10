@@ -1,0 +1,63 @@
+# Career-Ops — Archetype Registry (multi-profile, layer 2 of 2)
+#
+# Copy to config/archetypes.yml and edit. config/archetypes.yml is GITIGNORED;
+# this example is the only version that ships.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# WHAT AN ARCHETYPE IS
+#
+# One flavor of ONE person: a CV variant plus the targeting that goes with it.
+# The same experience, aimed differently — a backend-heavy resume and an
+# AI-engineering resume built from the same career.
+#
+# Selecting an archetype changes:
+#   • which .tex compiles when you generate a CV
+#   • which keywords weight scoring
+#   • which model runs, if you set one
+#
+# It does NOT change:
+#   • data/applications.md — ONE tracker per person, deliberately. You applied
+#     to that job once, whichever resume you sent.
+#   • reports/, data/scan-history.tsv — shared history
+#   • portals.yml — overlay only; this file never rewrites it
+#
+# The archetype used for an artifact is recorded on it (a tagged
+# `archetype=<id>` segment in the tracker Notes, and a key in each report's
+# Machine Summary block) so you can tell later which flavor produced what.
+#
+# With no config/archetypes.yml the switcher hides and behavior is unchanged.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+
+archetypes:
+  # id       — letters, digits, - and _
+  # label    — what you see in the switcher
+  # tex      — CV source, relative to the active root. Optional; falls back to
+  #            the default CV and warns once rather than failing a run.
+  # keywords — extra terms weighted up when scoring for this archetype
+  # model    — optional. A model string passed straight through to your CLI's
+  #            --model flag. NO model names are hardcoded in the app, so this is
+  #            the only place one appears. Omit to use your CLI's default.
+
+  - id: swe
+    label: "Software Engineer"
+    tex: "tex/swe.tex"
+    keywords: ["backend", "distributed systems", "API", "infrastructure"]
+
+  - id: ai_engineer
+    label: "AI Engineer"
+    tex: "tex/ai_engineer.tex"
+    keywords: ["LLM", "RAG", "evaluation", "fine-tuning", "inference"]
+    # A judgment-heavy archetype can be worth a stronger model. This is opt-in
+    # and per-archetype — bulk triage should stay on your cheap tier.
+    # model: "claude-fable-5-1"
+
+  - id: data_engineer
+    label: "Data Engineer"
+    tex: "tex/data_engineer.tex"
+    keywords: ["ETL", "pipeline", "warehouse", "schema", "SQL"]
+
+  # - id: solutions_architect
+  #   label: "Solutions Architect"
+  #   tex: "tex/solutions_architect.tex"
+  #   keywords: ["architecture", "pre-sales", "integration", "cloud"]
