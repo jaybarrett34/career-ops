@@ -1,6 +1,6 @@
 # PRD: Layered Multi-Profile Web UI
 
-**Status:** APPROVED 2026-09-10 · Phase 1 COMPLETE
+**Status:** APPROVED 2026-09-10 · Phases 1-7 COMPLETE
 **Branch:** `feat/multi-profile-web`
 **Author:** Claude (Opus 5) with Fable as advisor
 **Date:** 2026-09-10
@@ -111,11 +111,11 @@ database, cache, or mirror of user data.
 
 ### Functional — UI
 
-- [ ] **FR11** 3–5 `reactbits.dev` components, each where **motion carries information**, not
+- [x] **FR11** 3–5 `reactbits.dev` components, each where **motion carries information**, not
  decoration. Candidates: `AnimatedList` (pipeline inbox arrival/removal), `SpotlightCard`
  (job cards), `CountUp` (stat tiles), `GradientText` (active-profile indicator).
-- [ ] **FR12** Any new animation respects `prefers-reduced-motion`.
-- [ ] **FR13** The active root + archetype are visible on **every** page, not just a settings
+- [x] **FR12** Any new animation respects `prefers-reduced-motion`.
+- [x] **FR13** The active root + archetype are visible on **every** page, not just a settings
  screen. Acting on the wrong person's data is the failure mode this prevents.
 
 ### Functional — Chat router with tabs (Phase 7)
@@ -151,10 +151,10 @@ management and surface.
 
 ### Functional — Claude-in-Chrome experiment slot
 
-- [ ] **FR14** A documented, **disabled-by-default** slot for a Chrome-driven LinkedIn reader,
+- [x] **FR14** A documented, **disabled-by-default** slot for a Chrome-driven LinkedIn reader,
  with the hypothesis stated plainly: the extension reuses the user's authenticated session
  where headless Playwright gets walled.
-- [ ] **FR15** Ships as documentation + a stub interface, **not** a working scraper. See
+- [x] **FR15** Ships as documentation + a stub interface, **not** a working scraper. See
  "Open Questions" for the ToS position.
 
 ### Non-Functional
@@ -280,7 +280,7 @@ not visually bare today.
 - [ ] **AC6** `grep -rE "claude-(fable|opus|sonnet|haiku)" web/src/` returns **zero** hits (FR9).
 - [ ] **AC7** Test suite ≤ 2 failures, and both are the known baseline pair.
 - [ ] **AC8** Active root + archetype visible on every page.
-- [ ] **AC9** Chrome/LinkedIn slot is documented and inert — no scraping code ships enabled.
+- [x] **AC9** Chrome/LinkedIn slot is documented and inert — no scraping code ships enabled.
 - [ ] **AC10** Two chat tabs bound to different roots run workers concurrently; each writes only to its own root's tracker, verified by assertion, not by eye.
 - [ ] **AC11** A write action in an unfocused tab does not complete without that tab's confirm (FR20).
 - [ ] **AC12** An existing `career-ops:chat` transcript survives upgrade as tab 1.

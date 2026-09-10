@@ -39,12 +39,12 @@ Layer 2  ARCHETYPE  which CV/targeting flavor -> targeting and CV only
 | Phase | Adds | State |
 |---|---|---|
 | 1 | Data-root resolution matching the core's `path-resolver.mjs` | done, upstreamable |
-| 2 | Root registry, traversal-safe selection | in progress |
-| 3 | Archetype overlay | planned |
-| 4 | Per-run model routing (opt-in, no model names in `web/`) | planned |
-| 5 | Hand-ported motion components, no animation dependency | planned |
-| 6 | Claude-in-Chrome experiment slot (documented, inert) | planned |
-| 7 | Chat tabs bound to profiles, detachable surface | planned |
+| 2 | Root registry, traversal-safe selection | done |
+| 3 | Archetype overlay | done |
+| 4 | Per-run model routing (opt-in, no model names in `web/`) | done |
+| 5 | Hand-ported motion components, no animation dependency | done |
+| 6 | Claude-in-Chrome experiment slot (documented, inert) | done |
+| 7 | Chat tabs bound to profiles, detachable surface | done |
 
 ## Upstreaming policy
 

@@ -12,6 +12,7 @@ import { UsageMeter } from "@/components/usage-meter";
 import { instrumentSerif } from "@/lib/fonts";
 import { NAV_ITEMS, isActivePath } from "@/lib/nav-items";
 import { useJobs } from "@/components/jobs/job-store";
+import { ProfileSwitcher } from "@/components/profile-switcher";
 
 // Mobile navigation (< md): a glass top bar + a right-side slide-over drawer that
 // mirrors the desktop sidebar (nav + workers + usage + theme). Premium details:
@@ -109,7 +110,13 @@ export function MobileNav() {
           <CoMark size={26} />
           <span className={`${instrumentSerif.className} relative -top-px text-xl text-landing`}>career-ops</span>
         </Link>
-        <div className="ml-auto flex items-center gap-0.5">
+        {/* FR13: the desktop switcher lives in a `hidden md:flex` sidebar, so
+            without this the active person is invisible on a phone — and acting
+            as the wrong person is not a desktop-only hazard. */}
+        <div className="ml-auto flex min-w-0 max-w-[45%] items-center gap-0.5">
+          <ProfileSwitcher />
+        </div>
+        <div className="flex items-center gap-0.5">
           <ThemeToggle />
           <button
             type="button"
