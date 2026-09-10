@@ -4,6 +4,8 @@ import * as yaml from "js-yaml";
 import { cookies } from "next/headers";
 import { defaultCareerOpsRoot } from "@/lib/career-ops";
 import { normalizeRoots, checkRoot } from "@/lib/core/roots.mjs";
+import { normalizeArchetypes } from "@/lib/core/archetypes.mjs";
+import { resolveActiveRoot } from "@/lib/core/roots.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,10 +46,27 @@ function readRegistry() {
   }
 }
 
+/** Archetypes belong to a PERSON, so they are read from the active root. */
+function readArchetypesFor(rootPath: string) {
+  try {
+    return normalizeArchetypes(yaml.load(fs.readFileSync(path.join(rootPath, "config", "archetypes.yml"), "utf8")));
+  } catch {
+    return { archetypes: [], errors: [] as string[] };
+  }
+}
+
 export async function GET() {
   const { roots, errors } = readRegistry();
   const jar = await cookies();
   const activeId = jar.get(ROOT_COOKIE)?.value ?? null;
+  const activeArchetypeId = jar.get(ARCHETYPE_COOKIE)?.value ?? null;
+
+  // Which root's archetypes to list: the active one, else the install default.
+  const resolved = resolveActiveRoot(
+    roots, activeId, defaultCareerOpsRoot(),
+    (r) => checkRoot(r, fsq), (...a: string[]) => path.resolve(...a),
+  );
+  const { archetypes } = readArchetypesFor(resolved.path);
 
   // The absolute path is deliberately NOT returned. The UI needs a label and an
   // id; shipping the path to the client would put a filesystem map of every
@@ -69,8 +88,17 @@ export async function GET() {
     // the UI hides the switcher entirely.
     configured: items.length > 0,
     activeId,
-    activeArchetypeId: jar.get(ARCHETYPE_COOKIE)?.value ?? null,
+    activeArchetypeId,
     roots: items,
+    // Layer 2. The `model` field is deliberately NOT returned: it is an opaque
+    // model id the CLI consumes, and the picker has no use for it.
+    archetypes: archetypes.map((a) => ({
+      id: a.id,
+      label: a.label,
+      hasTex: a.tex !== null,
+      keywordCount: a.keywords.length,
+      active: activeArchetypeId !== null && a.id.toLowerCase() === activeArchetypeId.toLowerCase(),
+    })),
     errors,
   });
 }

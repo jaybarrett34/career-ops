@@ -16,6 +16,7 @@ import { buildPrompt, isShellSafeCompanyName } from "@/lib/run-prompts.mjs";
 import { claudeCliArgs } from "@/lib/claude-invocation.mjs";
 import { acquireTrackerWrite, releaseTrackerWrite } from "@/lib/core/run-registry";
 import { withActiveProfile } from "@/lib/core/with-profile";
+import { activeArchetype } from "@/lib/core/active-profile-types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -112,7 +113,9 @@ async function handlePOST(req: Request) {
     kind === "evaluate"
       ? readInbox().find((j) => j.url === input)?.postedAt ?? readScanDates().get(input)
       : undefined;
-  const prompt = buildPrompt({ kind, input, memory: readMemory(), today, postedAt, lang });
+  // The archetype comes from the request's profile scope, so a run started
+  // while "AI Engineer" is selected builds that flavor.
+  const prompt = buildPrompt({ kind, input, memory: readMemory(), today, postedAt, lang, archetype: activeArchetype() });
 
   const isClaude = cliId === "claude";
   // Which tools each kind gets, and the whole claude argv, live in

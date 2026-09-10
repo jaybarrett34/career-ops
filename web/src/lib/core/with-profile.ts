@@ -4,6 +4,7 @@ import path from "node:path";
 import * as yaml from "js-yaml";
 import { withProfile, type ActiveProfileShape } from "@/lib/core/active-profile-types";
 import { normalizeRoots, checkRoot, resolveActiveRoot } from "@/lib/core/roots.mjs";
+import { normalizeArchetypes, resolveArchetype } from "@/lib/core/archetypes.mjs";
 import { defaultCareerOpsRoot } from "@/lib/career-ops";
 
 /**
@@ -53,6 +54,7 @@ export async function resolveProfileFromRequest(): Promise<ActiveProfileShape> {
   const jar = await cookies();
   const { roots } = readRegistry();
   const requested = jar.get(ROOT_COOKIE)?.value ?? null;
+  const archetypeId = jar.get(ARCHETYPE_COOKIE)?.value ?? null;
 
   const resolved = resolveActiveRoot(
     roots,
@@ -65,11 +67,26 @@ export async function resolveProfileFromRequest(): Promise<ActiveProfileShape> {
   return {
     root: resolved.path,
     rootId: resolved.id,
-    // Layer 2 is an id only; resolving what it means is the archetype overlay's
-    // job, and it is deliberately not validated here so a bad value cannot stop
-    // a page from rendering its (correct) root.
-    archetypeId: jar.get(ARCHETYPE_COOKIE)?.value ?? null,
+    archetypeId,
+    // Resolved against the ACTIVE root, not the install: archetypes belong to a
+    // person, so switching person changes which flavors exist.
+    archetype: resolveArchetype(readArchetypes(resolved.path).archetypes, archetypeId),
   };
+}
+
+/** Read config/archetypes.yml from a specific root. */
+export function readArchetypes(root: string): ReturnType<typeof normalizeArchetypes> {
+  let raw: string;
+  try {
+    raw = fs.readFileSync(path.join(root, "config", "archetypes.yml"), "utf8");
+  } catch {
+    return { archetypes: [], errors: [] };
+  }
+  try {
+    return normalizeArchetypes(yaml.load(raw));
+  } catch (e) {
+    return { archetypes: [], errors: [`config/archetypes.yml is not valid YAML: ${e instanceof Error ? e.message : e}`] };
+  }
 }
 
 /**
