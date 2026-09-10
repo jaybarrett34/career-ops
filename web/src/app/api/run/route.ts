@@ -131,7 +131,14 @@ async function handlePOST(req: Request) {
   // A CLI with its own structured stream gets the argv that turns it on, so its
   // stdout matches spec.parseEvent below; spec.args stays the plain-text argv the
   // envelope-parsing routes rely on.
-  const args = isClaude ? claudeCliArgs({ kind, prompt }) : (spec.streamArgs ?? spec.args)(prompt);
+  // Per-archetype model, opt-in. Absent -> no --model flag -> the CLI's own
+  // default, which is what every run does today. Deliberately NOT applied to
+  // the other CLIs: each spells its own model flag differently, and guessing
+  // one wrong sends the run to a model that does not exist.
+  const archetypeModel = activeArchetype()?.model ?? null;
+  const args = isClaude
+    ? claudeCliArgs({ kind, prompt, model: archetypeModel })
+    : (spec.streamArgs ?? spec.args)(prompt);
 
   // For write-needing kinds, snapshot reports/ so we can verify the worker
   // actually persisted (non-Claude CLIs lack Write auth and silently no-op).

@@ -127,13 +127,27 @@ export function grantsWriteCapability(scope) {
  * Assembled here, not in the route, so a guard can assert on the command line
  * that actually ships instead of on source text that can be rewritten around it.
  *
- * @param {{kind: string, prompt: string}} args
+ * `model` is an OPAQUE STRING and this file never learns what any model is
+ * called. modes/_shared.md states its tier table is "the only place
+ * model/provider names appear"; the value travels from the user's own
+ * config/archetypes.yml to the CLI's --model flag without web/ ever naming it.
+ * Omitted or blank means "no --model flag", i.e. whatever the CLI defaults to,
+ * which is the behavior every existing install already has.
+ *
+ * Adding --model does NOT widen what a run may do: the permission model is
+ * carried entirely by --allowedTools/--disallowedTools below, and those are
+ * derived from `kind`, not from the model. See the KNOWN-list comment in
+ * clis.ts for why a runtime must never grant itself more than the audited path.
+ *
+ * @param {{kind: string, prompt: string, model?: string|null}} args
  * @returns {string[]}
  */
-export function claudeCliArgs({ kind, prompt }) {
+export function claudeCliArgs({ kind, prompt, model }) {
   const scope = toolScopeFor(kind);
+  const modelFlag = typeof model === "string" && model.trim() ? ["--model", model.trim()] : [];
   return [
     "-p", prompt,
+    ...modelFlag,
     "--output-format", "stream-json",
     "--verbose",
     "--include-partial-messages",
