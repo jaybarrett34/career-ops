@@ -241,6 +241,8 @@ const SYSTEM_PATHS = [
   'lib/latex-escape.mjs',
   'lib/cv-payload-schema.mjs',
   'scan-hn.mjs',
+  'scan-simplify.mjs',
+  'tests/scan-simplify.test.mjs',
   'scripts/check-syntax.mjs',
   'scripts/export-ats-text.mjs',
   'story-provenance-check.mjs',
