@@ -6,6 +6,7 @@ import { getSession } from "@/lib/apply/session";
 import { buildAnswerPrompt } from "@/lib/apply/answer-prompt.mjs";
 import { runPlanner } from "@/lib/apply/planner";
 import { extractJsonObject } from "@/lib/extract-json-object.mjs";
+import { withActiveProfile } from "@/lib/core/with-profile";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,7 +17,7 @@ export const maxDuration = 320;
 // report. We stream a live diagnostic log of every step (spawn, heartbeats,
 // exit code/signal, parse outcome) so a stuck/empty prefill is observable on the
 // page AND written to <root>/.career-ops-web/apply-prefill.log for debugging.
-export async function POST(req: Request) {
+async function handlePOST(req: Request) {
   let body: { sessionId?: string; cliId?: string };
   try {
     body = await req.json();
@@ -109,3 +110,6 @@ export async function POST(req: Request) {
 
   return new Response(stream, { headers: { "Content-Type": "application/x-ndjson", "Cache-Control": "no-store" } });
 }
+
+// Establishes the per-request profile scope; see lib/core/with-profile.ts.
+export const POST = withActiveProfile(handlePOST);

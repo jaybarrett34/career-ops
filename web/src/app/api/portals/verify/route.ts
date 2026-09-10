@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { careerOpsRoot, rootScript } from "@/lib/career-ops";
+import { withActiveProfile } from "@/lib/core/with-profile";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,7 +19,7 @@ const STATUS: Record<string, "live" | "empty" | "broken" | "skipped"> = {
   "➖": "skipped",
 };
 
-export async function GET() {
+async function handleGET() {
   const root = careerOpsRoot();
   const verifyPortals = rootScript("verify-portals");
   if (!fs.existsSync(verifyPortals)) {
@@ -44,3 +45,6 @@ export async function GET() {
   }
   return Response.json({ available: true, configured: true, companies });
 }
+
+// Establishes the per-request profile scope; see lib/core/with-profile.ts.
+export const GET = withActiveProfile(handleGET);

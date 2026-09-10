@@ -5,6 +5,7 @@ import { getNormalizeTextKey } from "@/lib/core/text-key";
 import { evaluatedKeys, isEvaluated } from "@/lib/whats-new-suppression.mjs";
 import type { DiscoveredOffer } from "@/lib/explore";
 import { collectWhatsNew, resolveOfferLimit } from "@/lib/whats-new.mjs";
+import { withActiveProfile } from "@/lib/core/with-profile";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,7 +20,7 @@ export const dynamic = "force-dynamic";
 // letter, so "Škoda" collided with "Koda" — suppressing a real offer as
 // "already evaluated" — and "日本電産" keyed to the empty string (#2666).
 
-export async function GET(req: Request) {
+async function handleGET(req: Request) {
   const searchParams = new URL(req.url).searchParams;
   const days = Math.min(30, Math.max(1, Number(searchParams.get("days")) || 7));
   // Home only needs enough offers for its cards; Explore's “See all” hand-off
@@ -59,3 +60,6 @@ export async function GET(req: Request) {
   const { offers, count } = collectWhatsNew(rows, { cutoff, toOffer, offerLimit });
   return Response.json({ offers, count });
 }
+
+// Establishes the per-request profile scope; see lib/core/with-profile.ts.
+export const GET = withActiveProfile(handleGET);

@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { careerOpsRoot, rootScript, trackerCanDelete } from "@/lib/career-ops";
 import { isTrackerWriting } from "@/lib/core/run-registry";
+import { withActiveProfile } from "@/lib/core/with-profile";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,7 +24,7 @@ function parseOrphan(stderr: string): string | null {
   return m ? m[1].trim() : null;
 }
 
-export async function POST(req: Request) {
+async function handlePOST(req: Request) {
   let body: { n?: string | number; dryRun?: boolean };
   try {
     body = await req.json();
@@ -103,3 +104,6 @@ export async function POST(req: Request) {
     if (!dryRun) deleting = false;
   }
 }
+
+// Establishes the per-request profile scope; see lib/core/with-profile.ts.
+export const POST = withActiveProfile(handlePOST);

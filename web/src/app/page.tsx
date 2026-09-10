@@ -2,10 +2,11 @@ import { pipelineSummary, doctorState } from "@/lib/career-ops";
 import { OnboardingBanner } from "@/components/onboarding-banner";
 import { FirstRunHome } from "@/components/home/first-run-home";
 import { TodayDashboard } from "@/components/home/today-dashboard";
+import { withActiveProfile } from "@/lib/core/with-profile";
 
 export const dynamic = "force-dynamic"; // always read fresh local files at request time (never at build — CI has no user data)
 
-export default function Home() {
+function Home() {
   const { phase, onboardingNeeded } = doctorState();
   // First run (truly empty install): the CV-upload takeover IS the home — value
   // before commitment. The full dashboard returns once they have a CV or any data.
@@ -22,3 +23,6 @@ export default function Home() {
     </>
   );
 }
+
+// Establishes the per-request profile scope; see lib/core/with-profile.ts.
+export default withActiveProfile(Home);

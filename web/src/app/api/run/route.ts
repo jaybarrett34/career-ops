@@ -15,12 +15,13 @@ import { createCvEnvelopeFilter, type CvEnvelope } from "@/lib/cv-envelope.mjs";
 import { buildPrompt, isShellSafeCompanyName } from "@/lib/run-prompts.mjs";
 import { claudeCliArgs } from "@/lib/claude-invocation.mjs";
 import { acquireTrackerWrite, releaseTrackerWrite } from "@/lib/core/run-registry";
+import { withActiveProfile } from "@/lib/core/with-profile";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 800; // a real oferta evaluation / pdf-mode CV tailoring + render is heavy and multi-step
 
-export async function POST(req: Request) {
+async function handlePOST(req: Request) {
   let body: { kind?: string; input?: string; cliId?: string };
   try {
     body = await req.json();
@@ -532,3 +533,6 @@ export async function POST(req: Request) {
     },
   });
 }
+
+// Establishes the per-request profile scope; see lib/core/with-profile.ts.
+export const POST = withActiveProfile(handlePOST);

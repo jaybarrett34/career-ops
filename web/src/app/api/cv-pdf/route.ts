@@ -5,6 +5,7 @@ import { resolveTailoredCv } from "@/lib/apply/cv";
 import { careerOpsRoot, isRegularContainedFile, pdfPathStatusForReport } from "@/lib/career-ops";
 import { companySlug } from "@/lib/company-slug.mjs";
 import { matchesTailoredCv, sortNewestFirst } from "@/lib/apply/cv-match.mjs";
+import { withActiveProfile } from "@/lib/core/with-profile";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,7 +30,7 @@ function servePdf(file: string): Response {
 // manifest existed. The fallback uses the SAME matching contract as
 // resolveTailoredCv (see cv-match.mjs) so this and the apply flow always land
 // on the same file.
-export async function GET(req: NextRequest) {
+async function handleGET(req: NextRequest) {
   const n = (req.nextUrl.searchParams.get("n") ?? "").trim();
   const company = (req.nextUrl.searchParams.get("company") ?? "").trim();
   const application = (req.nextUrl.searchParams.get("application") ?? "").trim();
@@ -102,3 +103,6 @@ export async function GET(req: NextRequest) {
     return new Response("could not read the PDF", { status: 500 });
   }
 }
+
+// Establishes the per-request profile scope; see lib/core/with-profile.ts.
+export const GET = withActiveProfile(handleGET);

@@ -1,4 +1,5 @@
 import { openSession } from "@/lib/apply/session";
+import { withActiveProfile } from "@/lib/core/with-profile";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -8,7 +9,7 @@ export const maxDuration = 300; // the agentic drive + interpretation fallbacks 
 // form, we extract + tag its fields. The session stays open for fill + handoff.
 // cliId enables the agentic fallback (the AI interprets the live form) when
 // deterministic extraction is low-confidence.
-export async function POST(req: Request) {
+async function handlePOST(req: Request) {
   let body: { url?: string; cliId?: string; agent?: boolean; _noApplyBtn?: boolean };
   try {
     body = await req.json();
@@ -24,3 +25,6 @@ export async function POST(req: Request) {
     return Response.json({ error: e instanceof Error ? e.message.slice(0, 200) : "could not open the form" }, { status: 500 });
   }
 }
+
+// Establishes the per-request profile scope; see lib/core/with-profile.ts.
+export const POST = withActiveProfile(handlePOST);

@@ -3,6 +3,7 @@ import * as yaml from "js-yaml";
 import { careerOpsRoot } from "@/lib/career-ops";
 import { atomicWriteWithBackup } from "@/lib/core/safe-write";
 import { loadPortalsDocument, mergePortalFilters, PortalsConfigError } from "@/lib/portals-config.mjs";
+import { withActiveProfile } from "@/lib/core/with-profile";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,7 +14,7 @@ export const dynamic = "force-dynamic";
 // tracked_companies plus every other block. Atomic write, confirm-gated
 // (setProfile/setPortals). This loads the first home scan after role confirmation.
 
-export async function POST(req: Request) {
+async function handlePOST(req: Request) {
   let body: { roles?: string[]; location?: string[] };
   try {
     body = (await req.json()) as { roles?: string[]; location?: string[] };
@@ -48,3 +49,6 @@ export async function POST(req: Request) {
   }
   return Response.json({ ok: true, roles: roles.length });
 }
+
+// Establishes the per-request profile scope; see lib/core/with-profile.ts.
+export const POST = withActiveProfile(handlePOST);

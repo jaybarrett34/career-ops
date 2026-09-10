@@ -1,6 +1,7 @@
 import { fillSession, handoffSession, getSession } from "@/lib/apply/session";
 import { resolveTailoredCv, companyFromTitle } from "@/lib/apply/cv";
 import type { ApplyField } from "@/lib/apply/extract";
+import { withActiveProfile } from "@/lib/core/with-profile";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -9,7 +10,7 @@ export const maxDuration = 120;
 // Fill the real form behind the scenes (headed-but-off-screen), screenshotting
 // each step for the "behind the scenes" strip, then bring the window to the front
 // so the HUMAN reviews and submits. NEVER submits — there is no submit path here.
-export async function POST(req: Request) {
+async function handlePOST(req: Request) {
   let body: { sessionId?: string; answers?: Record<string, string>; fields?: ApplyField[]; handoff?: boolean; company?: string; application?: string };
   try {
     body = await req.json();
@@ -38,3 +39,6 @@ export async function POST(req: Request) {
     return Response.json({ error: e instanceof Error ? e.message.slice(0, 200) : "fill failed" }, { status: 500 });
   }
 }
+
+// Establishes the per-request profile scope; see lib/core/with-profile.ts.
+export const POST = withActiveProfile(handlePOST);

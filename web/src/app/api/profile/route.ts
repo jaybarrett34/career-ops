@@ -3,6 +3,7 @@ import path from "node:path";
 import * as yaml from "js-yaml";
 import { careerOpsRoot } from "@/lib/career-ops";
 import { atomicWriteWithBackup } from "@/lib/core/safe-write";
+import { withActiveProfile } from "@/lib/core/with-profile";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -55,7 +56,7 @@ function patchToProfile(p: ProfilePatch): Record<string, unknown> {
   return out;
 }
 
-export async function POST(req: Request) {
+async function handlePOST(req: Request) {
   let patch: ProfilePatch;
   try {
     patch = (await req.json()) as ProfilePatch;
@@ -99,3 +100,6 @@ export async function POST(req: Request) {
   }
   return Response.json({ ok: true, seeded });
 }
+
+// Establishes the per-request profile scope; see lib/core/with-profile.ts.
+export const POST = withActiveProfile(handlePOST);

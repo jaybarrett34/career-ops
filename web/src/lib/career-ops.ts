@@ -3,6 +3,7 @@ import path from "node:path";
 import * as yaml from "js-yaml";
 import { atomicWrite } from "@/lib/core/safe-write";
 import { resolveDataRoot } from "@/lib/core/data-root.mjs";
+import { activeRoot } from "@/lib/core/active-root.mjs";
 import { parseApplications } from "@/lib/tracker-table.mjs";
 // One definition of the `{n}-RESERVED.md` convention, shared with
 // run-cli-support.mjs — see report-files.mjs for why it lives there.
@@ -21,6 +22,24 @@ import { pdfIndexEntryForReport } from "@/lib/apply/cv-selection.mjs";
  * checkout — see web/.env.local.
  */
 export function careerOpsRoot(): string {
+  // Layer 1 of the multi-profile design: if this request established a profile
+  // scope, its root wins. Outside any scope activeRoot() is null and we fall
+  // back to the install default, which is exactly the pre-feature behavior —
+  // see active-root.mjs on why that fallback is deliberately silent, and
+  // tests/lib/entry-point-coverage.test.mjs for what stops it hiding a bug.
+  const active = activeRoot();
+  if (active) return active;
+  return defaultCareerOpsRoot();
+}
+
+/**
+ * The install's own data root, ignoring any active profile. This is the
+ * resolution that matches the core's path-resolver.mjs; the profile layer sits
+ * on top of it. Callers that must read the install itself (root validation,
+ * the registry file) use this rather than careerOpsRoot(), which would recurse
+ * into whichever profile is active.
+ */
+export function defaultCareerOpsRoot(): string {
   // `process.cwd()` is `<core>/web` for `next dev`/`next start`, so its parent is
   // the core checkout — the same directory `path-resolver.mjs` calls `__dirname`.
   // resolveDataRoot() needs it explicitly because relative env values and marker
