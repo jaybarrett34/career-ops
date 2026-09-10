@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { instrumentSerif } from "@/lib/fonts";
 import { cn } from "@/lib/cn";
+import { CountUp } from "@/components/ui/motion";
 
 // Stat tile with the home's resting gradient corner + lit edge + shadow. The
 // number is serif ONLY when `featured` (≤1 serif number per route); the rest
@@ -33,6 +34,9 @@ export function StatCard({
       href={href}
       className={cn(
         "group relative overflow-hidden rounded-2xl border border-border bg-surface/50 bg-origin-border p-5 shadow-lg transition-colors",
+        // Cursor-following highlight; see components/ui/motion.tsx. Pure CSS
+        // custom properties, so a grid of these costs no re-renders.
+        "co-spotlight",
         CORNERS[corner],
         "from-brand/10 via-transparent to-transparent",
         "hover:border-brand/40 hover:bg-surface-hover group-hover:from-brand/20",
@@ -45,7 +49,7 @@ export function StatCard({
           featured ? instrumentSerif.className : "font-semibold",
         )}
       >
-        {value}
+        <CountUp value={value} />
       </div>
       <div className="mt-2 text-sm text-foreground">{label}</div>
       <div className="text-xs text-faint">{hint}</div>
