@@ -495,6 +495,10 @@ const BOOTSTRAP_PATHS = [
  * having an opinion about it (#2480).
  */
 export const USER_PATHS = [
+  // Fork-local documentation. USER_PATHS, not SYSTEM_PATHS: it does not exist
+  // upstream, so listing it as a system path would have `apply` skip it as
+  // absent and then prune it as a stale system file on the next update.
+  'FORK.md',
   'cv.md',
   'config/profile.yml',
   'modes/_profile.md',
