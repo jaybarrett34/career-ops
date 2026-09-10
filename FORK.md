@@ -46,12 +46,26 @@ Layer 2  ARCHETYPE  which CV/targeting flavor -> targeting and CV only
 | 6 | Claude-in-Chrome experiment slot (documented, inert) | planned |
 | 7 | Chat tabs bound to profiles, detachable surface | planned |
 
+## Upstreaming policy
+
+**Work lives here. Upstream contribution is a separate, deliberate decision, not the default.**
+
+`upstream`'s push URL is set to `DISABLED_no_push_to_upstream` on purpose, so an accidental
+`git push upstream` fails immediately. Pulling from upstream is expected and unaffected. When
+something is genuinely fixable-for-everyone, note it in the list below rather than opening a PR.
+
+Two PRs were opened before this policy and remain open:
+[#4064](https://github.com/career-ops-hq/career-ops/pull/4064) (data-root resolution) and
+[#4065](https://github.com/career-ops-hq/career-ops/pull/4065) (Node 22 test flag). If they are
+accepted, the corresponding local commits become redundant on the next `git pull upstream main`.
+They are not a precedent.
+
 ## Upstreamable vs local
 
 Some of this is a fix for everyone; some is specific to running several people from one install.
 Keeping them separate keeps the long-term conflict surface small.
 
-**Upstreamable** — opened or open-able as PRs against upstream:
+**Upstreamable in principle** — a fix any career-ops user would want:
 
 - `fix(web): resolve the data root exactly as the core does` — `web/careerOpsRoot()` honored only
   `CAREER_OPS_ROOT`, ignoring `CAREER_OPS_DATA_DIR` and the `.career-ops-data` marker the core
