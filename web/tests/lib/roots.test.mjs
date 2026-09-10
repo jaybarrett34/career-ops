@@ -172,3 +172,43 @@ test("the requested id is never used to build a path", () => {
   const roots = [{ id: "alpha", label: "Alpha", path: "/somewhere/else", enabled: true }];
   assert.equal(res("alpha", OK, roots).path, "/somewhere/else");
 });
+
+// ── resolution base: the bug this file's first version shipped ───────────────
+
+test("RELATIVE root paths resolve against the CHECKOUT, never the process cwd", () => {
+  // The web server runs with cwd = <checkout>/web. A bare path.resolve there
+  // sends "." to web/ and "../data" to <checkout>/data instead of the sibling
+  // of the checkout, so every relative root in config/roots.yml silently failed
+  // validation with "not a career-ops data root".
+  //
+  // Same resolution-base bug as data-root.mjs's marker handling, one layer up.
+  const CHECKOUT = "/repo/career-ops";
+  const CWD = "/repo/career-ops/web"; // where the server actually runs
+
+  const boundToCheckout = (...a) => path.resolve(CHECKOUT, ...a);
+  const boundToCwd = (...a) => path.resolve(CWD, ...a);
+
+  assert.equal(boundToCheckout("."), CHECKOUT);
+  assert.equal(boundToCwd("."), CWD, "sanity: cwd-relative really is different");
+
+  assert.equal(boundToCheckout("../resume-list/x"), "/repo/resume-list/x");
+  assert.notEqual(boundToCwd("../resume-list/x"), "/repo/resume-list/x");
+
+  // Absolute paths must be untouched by either base.
+  assert.equal(boundToCheckout("/abs/path"), "/abs/path");
+  assert.equal(boundToCwd("/abs/path"), "/abs/path");
+});
+
+test("checkRoot uses the injected resolve, so the base is the caller's choice", () => {
+  // checkRoot must not reach for path.resolve itself; injecting the resolver is
+  // what lets the call site pin the base. Prove it by injecting a marker.
+  const seen = [];
+  const q = {
+    exists: () => true,
+    isDir: () => true,
+    resolve: (...a) => { seen.push(a); return "/BASE/" + a.join("/"); },
+  };
+  checkRoot({ id: "r", label: "r", path: "rel/path", enabled: true }, q);
+  assert.ok(seen.length > 0, "checkRoot did not use the injected resolve");
+  assert.deepEqual(seen[0], ["rel/path"]);
+});

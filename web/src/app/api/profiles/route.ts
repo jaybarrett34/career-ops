@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { defaultCareerOpsRoot } from "@/lib/career-ops";
 import { normalizeRoots, checkRoot } from "@/lib/core/roots.mjs";
 import { normalizeArchetypes } from "@/lib/core/archetypes.mjs";
+import { rootFsQueries } from "@/lib/core/with-profile";
 import { resolveActiveRoot } from "@/lib/core/roots.mjs";
 
 export const runtime = "nodejs";
@@ -25,11 +26,9 @@ const ARCHETYPE_COOKIE = "career-ops-archetype";
 // cookie can never do more than fall back.
 const MAX_AGE = 60 * 60 * 24 * 365;
 
-const fsq = {
-  exists: (p: string) => fs.existsSync(p),
-  isDir: (p: string) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } },
-  resolve: (...a: string[]) => path.resolve(...a),
-};
+// Shared with the request path so the two can never disagree about where a
+// relative root path points. See rootFsQueries for why cwd is the wrong base.
+const fsq = rootFsQueries(defaultCareerOpsRoot());
 
 function readRegistry() {
   const file = path.join(defaultCareerOpsRoot(), "config", "roots.yml");
@@ -64,7 +63,7 @@ export async function GET() {
   // Which root's archetypes to list: the active one, else the install default.
   const resolved = resolveActiveRoot(
     roots, activeId, defaultCareerOpsRoot(),
-    (r) => checkRoot(r, fsq), (...a: string[]) => path.resolve(...a),
+    (r) => checkRoot(r, fsq), (...a: string[]) => path.resolve(defaultCareerOpsRoot(), ...a),
   );
   const { archetypes } = readArchetypesFor(resolved.path);
 
