@@ -6,6 +6,7 @@ import { cn } from "@/lib/cn";
 import { CoMark } from "@/components/co-mark";
 import { AssistantConsole } from "@/components/assistant-console";
 import { MobileNav } from "@/components/mobile-nav";
+import { ProfileSwitcher } from "@/components/profile-switcher";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { BackToTop } from "@/components/back-to-top";
 import { JobsProvider } from "@/components/jobs/job-store";
@@ -64,6 +65,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <WorkerPills />
 
           <div className="mt-auto space-y-3 pt-4">
+            {/* Which person's data is active. Hides itself when config/roots.yml
+                is absent, i.e. the single-person install. */}
+            <ProfileSwitcher />
             <UsageMeter />
             <div className="flex items-center justify-between px-1">
               <span className={`${instrumentSerif.className} text-sm text-faint`}>local-first · v0</span>
