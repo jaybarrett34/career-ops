@@ -372,6 +372,8 @@ const SYSTEM_PATHS = [
   'fonts/',
   'examples/',
   'config/profile.example.yml',
+  'config/roots.example.yml',
+  'config/archetypes.example.yml',
   'config/local-paths.example.txt',
   '.env.example',
   '.editorconfig',
