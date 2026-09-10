@@ -57,8 +57,24 @@ database, cache, or mirror of user data.
       → `CAREER_OPS_DATA_DIR` → `.career-ops-data` marker file → repo default. **It currently
       honors only the first**, diverging from `path-resolver.mjs`. This is a standalone bug fix
       and ships first, independently.
+- [ ] **FR1a** ⚠️ **Resolution base — the subtle half of FR1.** `path-resolver.mjs` resolves the
+      marker and env values relative to `__dirname` (**the core checkout**). `web/`'s current
+      resolver uses `process.cwd()` (**`web/`**) then `..`. A relative value like `../shared-data`
+      therefore resolves to *two different directories* under the two implementations — same
+      string, different base, silently different data root.
+      **Required:** resolve relative to the **core root**, identically to `path-resolver.mjs`.
+      **Preferred implementation:** import `getCareerOpsRoot` from the core rather than
+      re-implementing it — it is the same repository, and two implementations of one rule is how
+      this diverged in the first place. **Spike first:** confirm the import survives Next's
+      bundler; `career-ops.ts`'s `rootScript()` carries a `turbopackIgnore` comment precisely
+      because Turbopack statically traces core paths as module imports. If the import cannot cross
+      that boundary cleanly, port the function verbatim with a comment naming `path-resolver.mjs`
+      as the source of truth and a test asserting the two agree.
 - [ ] **FR2** A registry of known roots lives at `config/roots.yml` (gitignored, user layer):
       `{id, label, path, enabled}`. Absent file → single implicit root = today's behavior.
+      **The registry is hand-edited only. The web app never writes a path into it** — not now, and
+      no "Add root" form later. FR3 closes the read side of the traversal primitive; this closes
+      the write side. Adding a root is a deliberate act of editing a file on disk.
 - [ ] **FR3** The active root is **server-side session state**, not a client value. A client that
       can name an arbitrary path is a directory-traversal read primitive against the user's disk.
 - [ ] **FR4** Every root in the registry is validated on selection: path exists, is a directory,
@@ -73,8 +89,13 @@ database, cache, or mirror of user data.
 - [ ] **FR6** Selecting an archetype overlays **targeting and CV only**: which `.tex` compiles,
       which keywords weight scoring, which CV a report links. It never rewrites `portals.yml`,
       the tracker, or `modes/_profile.md`.
-- [ ] **FR7** The active archetype is recorded on rows it produces (report front-matter and the
-      tracker Notes column), so a later reader can tell which flavor generated an artifact.
+- [ ] **FR7** The active archetype is recorded on every artifact it produces, in **machine-findable
+      form**, so a later reader can tell which flavor generated it:
+      - **Tracker:** a *tagged* segment in the Notes column — `archetype=ai_engineer` — matching the
+        existing `via=Agency` convention (`merge-tracker.mjs`). Never prose; a parser must be able
+        to find it. Written through `set-status.mjs` / the TSV path, never by hand-editing the table.
+      - **Reports:** a named key inside the existing `## Machine Summary` YAML block, not loose
+        front-matter.
 
 ### Functional — Model routing (Fable)
 
@@ -230,19 +251,28 @@ not visually bare today.
 
 ---
 
+## Decisions taken (were open, now closed)
+
+**D1 — LinkedIn: documented + inert, no scraper.** Automated collection from LinkedIn violates
+their User Agreement and they litigate it actively. `linkedin-join.mjs` already handles the
+**official export CSV**, which is permitted, needs no automation, and works today. The Chrome slot
+ships as a written experiment record — the hypothesis, what to try, what to watch — with no
+enabled scraping code. This is not a request for permission; it is the scope.
+
+**D2 — Multi-tab: cookie-scoped, not last-write-wins.** Active root + archetype scope to a cookie
+so two tabs can hold different profiles independently. Server-side global state means opening a
+second tab silently repoints the first — which is precisely the data-mixing failure FR13 exists to
+prevent, and "acting as the wrong person" is the most expensive mistake this feature can make.
+Costs roughly a day over the naive version. Worth it.
+
 ## Open Questions
 
-- [ ] **OQ1 — LinkedIn ToS.** Automated collection from LinkedIn violates their User Agreement,
-      and they actively litigate it. `linkedin-join.mjs` already handles the **official export
-      CSV** path, which is permitted and needs no automation. Do you want the Chrome slot
-      documented as an experiment anyway (my recommendation: yes, documented + inert), or dropped
-      in favor of the export path?
+*(OQ1 and OQ4 were open in the first draft and are now decided — see "Decisions taken" below.)*
+
 - [ ] **OQ2 — Fable default.** Confirm: Fable selectable for *building* pipelines, never the
       default for bulk *running*. Your limits are shared with the trading instance.
 - [ ] **OQ3 — Animation dependency.** Adopt Framer Motion (~50KB, unlocks most reactbits
       components as written), or hand-port to CSS and add nothing?
-- [ ] **OQ4 — Multi-tab.** Accept "last write wins" across tabs, or scope active profile to a
-      cookie so tabs are independent? Cookie-scoping is more correct and roughly a day more work.
 - [ ] **OQ5 — Core update.** `update-system.mjs` reports **1.31.0 → 1.32.0** available
       (`system-files-changed`). Recommend applying **before** this work, not during — it rewrites
       system files by raw checkout, not merge. Apply now, or after?
@@ -261,3 +291,10 @@ not visually bare today.
 | **6** | FR14–FR15 Chrome slot (docs) | ✅ Yes |
 
 Phase 1 is worth doing regardless of whether the rest is approved.
+
+**Phase 1 should also go upstream as its own PR.** It fixes a genuine divergence between
+`web/careerOpsRoot()` and the core's `path-resolver.mjs` — a bug for any user with a
+`.career-ops-data` marker, not something specific to this feature. `origin` *is*
+`career-ops-hq/career-ops`, so upstreaming it is the one piece that need not live on a local
+branch forever, and every accepted upstream line is one less line that conflicts on the next
+`git pull`. Everything else here is Jay-specific and stays on `feat/multi-profile-web`.
