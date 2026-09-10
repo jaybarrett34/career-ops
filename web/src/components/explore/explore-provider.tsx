@@ -9,7 +9,7 @@ import {
   aiToParams,
   isBroadSearch,
   parseExplorePatch,
-  type AtsSource,
+  type DiscoverSource,
   type DiscoveredOffer,
   type ExploreFilters,
   type ExploreMode,
@@ -50,7 +50,7 @@ type ExploreCtx = {
   phase: Phase;
   running: boolean;
   offers: DiscoveredOffer[];
-  sources: Partial<Record<AtsSource, SourceState>>;
+  sources: Partial<Record<DiscoverSource, SourceState>>;
   matchCount: number;
   companiesScanned: number;
   companiesAvailable: number;
@@ -102,7 +102,7 @@ type ResultSnapshot = {
   companiesAvailable: number;
   capHit: boolean;
   droppedNoDate: number;
-  sources: Partial<Record<AtsSource, SourceState>>;
+  sources: Partial<Record<DiscoverSource, SourceState>>;
   partial: boolean;
   status: string;
   error: string;
@@ -119,7 +119,7 @@ export function ExploreProvider({ children }: { children: React.ReactNode }) {
   const touched = useRef(false);
   const [phase, setPhase] = useState<Phase>("idle");
   const [offers, setOffers] = useState<DiscoveredOffer[]>([]);
-  const [sources, setSources] = useState<Partial<Record<AtsSource, SourceState>>>({});
+  const [sources, setSources] = useState<Partial<Record<DiscoverSource, SourceState>>>({});
   const [matchCount, setMatchCount] = useState(0);
   const [companiesScanned, setCompaniesScanned] = useState(0);
   // Authoritative scan-health signals (scanner --json mode, #1199): tell a capped /
@@ -169,7 +169,7 @@ export function ExploreProvider({ children }: { children: React.ReactNode }) {
     setError("");
     setScannerMissing(false);
     setStatus("Casting the net across the ATS network…");
-    const init: Partial<Record<AtsSource, SourceState>> = {};
+    const init: Partial<Record<DiscoverSource, SourceState>> = {};
     for (const a of f.ats) init[a] = { state: "queued" };
     setSources(init);
     if (typeof window !== "undefined") {
@@ -222,17 +222,17 @@ export function ExploreProvider({ children }: { children: React.ReactNode }) {
             switch (ev.kind) {
               case "atsStart":
                 setPhase("scanning");
-                setStatus(`Walking ${ATS_LABEL[ev.ats as AtsSource] ?? ev.ats} — ${ev.companies.toLocaleString()} companies`);
-                setSources((s) => ({ ...s, [ev.ats]: { ...s[ev.ats as AtsSource], state: "active", companies: ev.companies } }));
+                setStatus(`Walking ${ATS_LABEL[ev.ats as DiscoverSource] ?? ev.ats} — ${ev.companies.toLocaleString()} companies`);
+                setSources((s) => ({ ...s, [ev.ats]: { ...s[ev.ats as DiscoverSource], state: "active", companies: ev.companies } }));
                 break;
               case "progress":
                 // `matches` is the GLOBAL running total (the engine batches the
                 // offer list to the very end), so it drives the live hero counter.
                 setMatchCount((m) => Math.max(m, ev.matches));
-                setSources((s) => ({ ...s, [ev.ats]: { ...s[ev.ats as AtsSource], state: "active", done: ev.scanned, total: ev.total } }));
+                setSources((s) => ({ ...s, [ev.ats]: { ...s[ev.ats as DiscoverSource], state: "active", done: ev.scanned, total: ev.total } }));
                 break;
               case "atsDone":
-                setSources((s) => ({ ...s, [ev.ats]: { ...s[ev.ats as AtsSource], state: ev.unreachable > 0 ? "noisy" : "swept", unreachable: ev.unreachable } }));
+                setSources((s) => ({ ...s, [ev.ats]: { ...s[ev.ats as DiscoverSource], state: ev.unreachable > 0 ? "noisy" : "swept", unreachable: ev.unreachable } }));
                 break;
               case "offer":
                 acc.push(ev.offer);
@@ -271,7 +271,7 @@ export function ExploreProvider({ children }: { children: React.ReactNode }) {
     // Mark any still-active sources as swept (stream ended).
     setSources((s) => {
       const next = { ...s };
-      for (const k of Object.keys(next) as AtsSource[]) if (next[k]?.state === "active" || next[k]?.state === "queued") next[k] = { ...next[k]!, state: "swept" };
+      for (const k of Object.keys(next) as DiscoverSource[]) if (next[k]?.state === "active" || next[k]?.state === "queued") next[k] = { ...next[k]!, state: "swept" };
       return next;
     });
 

@@ -3,13 +3,13 @@
 // first_seen date). 🔴 None of this ranks or scores relevance; it only labels and
 // buckets so the cheap facet filters can narrow the firehose with zero tokens.
 
-import type { AtsSource } from "@/lib/explore";
+import type { DiscoverSource } from "@/lib/explore";
 
 /** Which ATS a posting lives on, derived from its URL host (0 tokens, no network).
  *  Matches on the registrable domain anchored at a dot boundary (host === base OR
  *  host ends with ".base") — never a bare substring, so "greenhouse.io.evil.com"
  *  or "notlever.co" can't be misread as that ATS. */
-export function sourceFromUrl(url: string): AtsSource | null {
+export function sourceFromUrl(url: string): DiscoverSource | null {
   let host = "";
   try {
     host = new URL(url).hostname.toLowerCase();

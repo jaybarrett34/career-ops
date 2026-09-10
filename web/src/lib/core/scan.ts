@@ -2,9 +2,9 @@ import { spawn } from "node:child_process";
 import fs from "node:fs";
 import { careerOpsRoot, rootScript } from "@/lib/career-ops";
 import { writeTempPortals, cleanupTempPortals } from "./portals";
-import { ATS_SOURCES, type DiscoveredOffer, type ExploreFilters, type ScanEvent } from "@/lib/explore";
+import { ATS_SOURCES, SIMPLIFY_SOURCES, isSimplifySource, type DiscoveredOffer, type ExploreFilters, type ScanEvent } from "@/lib/explore";
 
-export type { DiscoveredOffer, ScanEvent, AtsSource } from "@/lib/explore";
+export type { DiscoveredOffer, ScanEvent, DiscoverSource } from "@/lib/explore";
 export { ATS_SOURCES } from "@/lib/explore";
 
 /**
@@ -80,7 +80,69 @@ type ScanJson = {
   offers?: JsonOffer[];
 };
 
-export function runDiscovery(filters: ExploreFilters, onEvent: (e: ScanEvent) => void): Promise<DiscoveredOffer[]> {
+/**
+ * Discovery across BOTH scanner kinds.
+ *
+ * The Sources row mixes two things that are fetched differently: ATS
+ * directories (scan-ats-full.mjs, a slug-by-slug crawl) and the SimplifyJobs
+ * community lists (scan-simplify.mjs, one HTTPS GET). They run sequentially
+ * rather than merged into one stream, because a shared stream would have to
+ * interleave two different progress grammars for no user benefit -- Simplify
+ * finishes in seconds and the crawl is the long pole.
+ *
+ * Simplify runs FIRST so its results are on screen while the crawl works.
+ */
+export async function runDiscovery(filters: ExploreFilters, onEvent: (e: ScanEvent) => void): Promise<DiscoveredOffer[]> {
+  const simplify = filters.ats.filter((a) => isSimplifySource(a));
+  const atsOnly = filters.ats.filter((a) => !isSimplifySource(a));
+
+  const out: DiscoveredOffer[] = [];
+  if (simplify.length) out.push(...(await runSimplifyDiscovery(filters, simplify, onEvent)));
+  // An all-Simplify selection must not fall through to "no sources means all
+  // sources" in runAtsDiscovery, which would start a full crawl the user did
+  // not ask for.
+  if (atsOnly.length || filters.ats.length === 0) {
+    out.push(...(await runAtsDiscovery({ ...filters, ats: atsOnly }, onEvent)));
+  }
+  return out;
+}
+
+/** One scan-simplify.mjs run per selected list, parsed from its --json output. */
+function runSimplifyDiscovery(
+  filters: ExploreFilters,
+  lists: string[],
+  onEvent: (e: ScanEvent) => void,
+): Promise<DiscoveredOffer[]> {
+  return new Promise((resolve) => {
+    const offers: DiscoveredOffer[] = [];
+    let remaining = lists.length;
+    for (const list of lists) {
+      onEvent({ kind: "atsStart", ats: list, companies: 0 });
+      const child = spawn(process.execPath, [
+        rootScript("scan-simplify"),
+        "--json",
+        "--list", list.replace(/^simplify-/, ""),
+        "--since", String(Math.max(1, filters.sinceDays || 7)),
+        "--limit", String(Math.max(1, filters.limitPerAts || 150)),
+      ], { cwd: careerOpsRoot(), env: { ...process.env } });
+
+      let buf = "";
+      child.stdout.on("data", (d) => { buf += String(d); });
+      child.on("close", () => {
+        try {
+          const parsed = JSON.parse(buf) as { offers?: DiscoveredOffer[] };
+          for (const o of parsed.offers ?? []) offers.push(o);
+        } catch {
+          // A list that fails to parse costs that list, never the whole run.
+        }
+        onEvent({ kind: "atsDone", ats: list, unreachable: 0 });
+        if (--remaining === 0) resolve(offers);
+      });
+    }
+  });
+}
+
+function runAtsDiscovery(filters: ExploreFilters, onEvent: (e: ScanEvent) => void): Promise<DiscoveredOffer[]> {
   return new Promise((resolve) => {
     const tempPortals = writeTempPortals(filters);
     const ats = (filters.ats.length ? filters.ats : [...ATS_SOURCES]).filter((a) => (ATS_SOURCES as readonly string[]).includes(a));
