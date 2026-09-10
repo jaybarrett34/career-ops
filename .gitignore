@@ -58,6 +58,17 @@ writing-samples/*
 config/profile.yml
 config/cv-facts.json
 config/benchmarks.yml
+# The multi-profile registries. `config/` is ignored PER FILE, not wholesale, so
+# a new user-layer file here is tracked by default — these two must be named or
+# they get committed.
+#
+# roots.yml maps every person this install can act as to an absolute path on
+# disk, with a human label. Committed, it publishes a filesystem map of where
+# each person's job search lives, and the labels are usually real names — for
+# people who never consented to appear in a public repo. archetypes.yml is
+# milder but still describes the user's targeting.
+config/roots.yml
+config/archetypes.yml
 # Fork-local path declarations — this checkout's own files, read by
 # update-system.mjs. Gitignored on purpose: it describes THIS clone, not the
 # project, and must survive the sync that overwrites update-system.mjs (#2421).
