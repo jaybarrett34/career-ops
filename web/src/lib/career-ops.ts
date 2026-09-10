@@ -69,7 +69,14 @@ export function defaultCareerOpsRoot(): string {
 export function rootScript(nameNoExt: string): string {
   // The core checkout is selected at runtime and must not be bundled into the
   // web server output when Turbopack sees this dynamic script path.
-  return path.join(/* turbopackIgnore: true */ careerOpsRoot(), `${nameNoExt}.mjs`);
+  //
+  // defaultCareerOpsRoot(), NOT careerOpsRoot(): scripts are SYSTEM layer and
+  // live in the checkout, while careerOpsRoot() now returns whichever PERSON's
+  // data root is active. Resolving a script through the profile would look for
+  // scan-ats-full.mjs inside someone's data directory, find nothing, and report
+  // the scanner as missing for that profile only -- a failure that appears when
+  // you switch person and looks like a broken install.
+  return path.join(/* turbopackIgnore: true */ defaultCareerOpsRoot(), `${nameNoExt}.mjs`);
 }
 
 // Feature-detect the core's `tracker.mjs delete --num` row-delete (#1200) by probing
