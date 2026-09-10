@@ -302,6 +302,60 @@ not visually bare today.
 
 ---
 
+## Spike results: AsyncLocalStorage across Next 16 boundaries (2026-09-10)
+
+Run against the real app on `next dev`, Next 16.3.3, Node 22.14. Spike routes were removed
+afterward and `src/app/layout.tsx` restored byte-identical.
+
+| Question | Result |
+|---|---|
+| ALS survives an `await` inside a route handler, down to a **sync** leaf? | **YES** |
+| Same inside a server component (`page.tsx`)? | **YES** |
+| ALS scope closes cleanly after the wrapper returns? | **YES** (reads `null` outside) |
+| Root `layout.tsx` scope reaches **child pages**? | **NO** |
+| `cookies()` readable in a server component? | **YES** |
+
+Route handler:
+```json
+{ "outside": null,
+  "direct":       "/data/spike-root",
+  "throughAwait": "/data/spike-root",
+  "after": null }
+```
+
+Root layout wrapping a child page:
+```json
+{ "seenByChild": null }
+```
+
+### What this settles
+
+**The good news:** a wrapped entry point gets the active root to every sync leaf beneath it,
+through awaits and stack frames. So `careerOpsRoot()` and its **38 existing callers need no
+changes at all** — the original hope holds *within* a request.
+
+**The constraint:** React renders child pages in a separate async context from their layout, so
+there is no single place to wrap. **Each entry point must wrap itself** — roughly 12 pages and
+30 API routes.
+
+**Middleware cannot do it.** Next middleware runs to completion *before* the handler, so it
+cannot hold an async scope open across it. It is a filter, not a wrapper. What it can do is
+validate the cookie once and normalize it into a request header.
+
+### Consequent design (supersedes the ALS-everywhere assumption in FR3)
+
+- [ ] **FR3a** `withRoot(root, fn)` wraps each entry point. `activeRoot()` returns `null` outside
+      any scope, and `careerOpsRoot()` falls back to the default root in that case — so an
+      **unwrapped** entry point behaves exactly as it does today rather than crashing.
+- [ ] **FR3b** That fallback is safe but silent, and a missed entry point is an invisible
+      correctness bug: the page would read the *default* person's tracker while the switcher
+      claims another. **A test therefore enumerates `src/app/**/page.tsx` and `**/route.ts` and
+      asserts each one wraps.** Completeness is enforced mechanically, not by review.
+- [ ] **FR3c** Middleware work goes in **`src/proxy.ts`** — Next 16 renamed `middleware.ts` to
+      `proxy.ts`, and this app already has one doing the same-origin guard. It gains cookie
+      validation against the registry. Note its matcher is `/api/:path*`, so **pages are not
+      covered by it** and must validate at their own entry point.
+
 ## Decisions taken (were open, now closed)
 
 **D1 — LinkedIn: documented + inert, no scraper.** Automated collection from LinkedIn violates
