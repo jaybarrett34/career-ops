@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Users, Check, AlertTriangle, ChevronDown } from "lucide-react";
+import { Users, Check, AlertTriangle, ChevronDown, Layers } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 /**
@@ -26,10 +26,20 @@ type Root = {
   active: boolean;
 };
 
+type Archetype = {
+  id: string;
+  label: string;
+  hasTex: boolean;
+  keywordCount: number;
+  active: boolean;
+};
+
 type Payload = {
   configured: boolean;
   activeId: string | null;
+  activeArchetypeId: string | null;
   roots: Root[];
+  archetypes: Archetype[];
   errors: string[];
 };
 
@@ -68,19 +78,24 @@ export function ProfileSwitcher() {
     };
   }, [open]);
 
-  if (!data?.configured) return null; // single-person install
+  // Each layer hides independently: a single-person install with archetypes
+  // still gets the archetype picker, and vice versa.
+  if (!data) return null;
+  const showRoots = data.configured;
+  const showArchetypes = (data.archetypes?.length ?? 0) > 0;
+  if (!showRoots && !showArchetypes) return null;
 
   const active = data.roots.find((r) => r.active);
   const label = active?.label ?? "Default";
 
-  async function select(rootId: string | null) {
-    setBusy(rootId ?? "__default__");
+  async function select(patch: { rootId?: string | null; archetypeId?: string | null }) {
+    setBusy((patch.rootId ?? patch.archetypeId ?? "__default__") as string);
     setError(null);
     try {
       const res = await fetch("/api/profiles", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rootId }),
+        body: JSON.stringify(patch),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -102,8 +117,12 @@ export function ProfileSwitcher() {
     }
   }
 
+  const activeArchetype = data.archetypes?.find((a) => a.active);
+
   return (
     <div ref={boxRef} className="relative px-1">
+      {showRoots && (
+      <>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -136,7 +155,7 @@ export function ProfileSwitcher() {
             aria-selected={r.active}
             disabled={!r.usable || busy !== null}
             title={r.reason ?? undefined}
-            onClick={() => select(r.id)}
+            onClick={() => select({ rootId: r.id })}
             className={cn(
               "flex w-full items-center gap-2 px-2.5 py-2 text-left text-sm transition-colors",
               r.usable ? "hover:bg-surface-hover" : "cursor-not-allowed opacity-50",
@@ -158,7 +177,7 @@ export function ProfileSwitcher() {
         {data.activeId && (
           <button
             type="button"
-            onClick={() => select(null)}
+            onClick={() => select({ rootId: null })}
             disabled={busy !== null}
             className="flex w-full items-center gap-2 border-t border-border px-2.5 py-2 text-left text-xs text-muted transition-colors hover:bg-surface-hover"
           >
@@ -168,8 +187,38 @@ export function ProfileSwitcher() {
         )}
       </div>
 
+      </>
+      )}
+
+      {showArchetypes && (
+        <div className={cn("relative", showRoots && "mt-1.5")}>
+          <label className="sr-only" htmlFor="archetype-select">CV archetype</label>
+          <div className="flex items-center gap-2 rounded-md border border-border bg-surface/50 px-2.5 py-2">
+            <Layers className="size-3.5 shrink-0 text-muted" />
+            {/* A native select, deliberately: layer 2 is a plain one-of-N choice
+                with no per-option state to show, so a custom menu would be more
+                code and less keyboard-accessible for no gain. */}
+            <select
+              id="archetype-select"
+              value={activeArchetype?.id ?? ""}
+              disabled={busy !== null}
+              onChange={(e) => select({ archetypeId: e.target.value || null })}
+              className="min-w-0 flex-1 cursor-pointer truncate bg-transparent text-sm text-foreground outline-none"
+            >
+              <option value="">No archetype</option>
+              {data.archetypes.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.label}
+                  {a.hasTex ? "" : " (no CV source)"}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
+
       {error && <p className="mt-1 px-1 text-[11px] leading-snug text-red-500">{error}</p>}
-      {data.errors?.length > 0 && (
+      {data.errors.length > 0 && (
         <p className="mt-1 px-1 text-[11px] leading-snug text-amber-600" title={data.errors.join("\n")}>
           {data.errors.length} problem{data.errors.length > 1 ? "s" : ""} in config/roots.yml
         </p>

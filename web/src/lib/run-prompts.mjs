@@ -51,7 +51,38 @@ const SAFE_COMPANY_NAME = /^[\p{L}\p{N} .,&'()+/-]+$/u;
 /** ISO calendar date, the only form the dashboard's POSTED column parses. */
 const ISO_DATE_RE = /^20\d{2}-\d{2}-\d{2}$/;
 
-export function buildPrompt({ kind, input, memory, today, postedAt, lang }) {
+export function buildPrompt(args) {
+  // The archetype note is appended CENTRALLY rather than inside each branch.
+  // Folding it into the shared `mem` string was tried and was wrong: not every
+  // branch interpolates `mem` — `pdf`, the one that actually builds the CV,
+  // does not — so the selection silently did nothing on exactly the kind the
+  // user cares about most, while the UI still showed it active. A wrapper
+  // cannot be missed by a branch that forgets to opt in, and a new kind added
+  // later inherits it for free.
+  return buildBasePrompt(args) + archetypeNote(args.archetype);
+}
+
+/**
+ * The archetype overlay, stated as DATA the agent reads rather than
+ * instructions it obeys: an archetype file is user-authored config, and the
+ * no-fabrication rule is unchanged by it. `model` is deliberately absent — it
+ * is applied as a --model flag on the invocation, never something the agent
+ * reads about itself.
+ *
+ * @param {{id: string, label: string, tex: string|null, keywords: string[]}|null|undefined} archetype
+ */
+function archetypeNote(archetype) {
+  if (!archetype) return "";
+  const kw = archetype.keywords?.length
+    ? ` Weight these themes where the user's REAL experience already supports them, never by inventing any: ${archetype.keywords.join(", ")}.`
+    : "";
+  const tex = archetype.tex
+    ? ` The user maintains a hand-tuned CV source for this archetype at ${archetype.tex} (relative to their data root) — read it for structure and emphasis if present.`
+    : "";
+  return `\n\nACTIVE ARCHETYPE: "${archetype.label}" (id: ${archetype.id}). Tailor toward this framing of the user's experience.${kw}${tex}\n`;
+}
+
+function buildBasePrompt({ kind, input, memory, today, postedAt, lang }) {
   // AGENTS.md's "Output Language vs Market Modes" composition rule. The CLI
   // picks this up by reading AGENTS.md interactively; a one-shot headless
   // prompt has no such chance, so the rule has to be stated in the prompt or a
@@ -68,6 +99,7 @@ export function buildPrompt({ kind, input, memory, today, postedAt, lang }) {
       : "";
   const languageDirective = `\n\nWrite all human-facing output in "${resolvedLang.output}" regardless of the language of these instructions or the job description.${marketNote}\n`;
   const mem = (memory.trim() ? `\n\nDurable notes about the user (from their profile):\n${memory.trim()}\n` : "") + languageDirective;
+
   if (kind === "research") {
     return `You are investigating the user's OWN work / portfolio to surface job-search-relevant strengths, headless. Investigate the target (use WebFetch for URLs; read local files if referenced) and report: what it is, why it is impressive, and how to leverage it in their job search — which roles/claims it supports and how to frame it on a CV. Be specific, honest, and encouraging. Report only: never submit, send, or click Apply anywhere, and contact no one — you are investigating the user's own work, not acting on it.${mem}
 
