@@ -1,6 +1,6 @@
 # PRD: Layered Multi-Profile Web UI
 
-**Status:** DRAFT — awaiting approval
+**Status:** APPROVED 2026-09-10 · Phase 1 COMPLETE
 **Branch:** `feat/multi-profile-web`
 **Author:** Claude (Opus 5) with Fable as advisor
 **Date:** 2026-09-10
@@ -53,11 +53,11 @@ database, cache, or mirror of user data.
 
 ### Functional — Layer 1: Root switcher
 
-- [ ] **FR1** `web/`'s `careerOpsRoot()` honors the core's full resolution order: `CAREER_OPS_ROOT`
+- [x] **FR1** `web/`'s `careerOpsRoot()` honors the core's full resolution order: `CAREER_OPS_ROOT`
       → `CAREER_OPS_DATA_DIR` → `.career-ops-data` marker file → repo default. **It currently
       honors only the first**, diverging from `path-resolver.mjs`. This is a standalone bug fix
       and ships first, independently.
-- [ ] **FR1a** ⚠️ **Resolution base — the subtle half of FR1.** `path-resolver.mjs` resolves the
+- [x] **FR1a** ⚠️ **Resolution base — the subtle half of FR1.** `path-resolver.mjs` resolves the
       marker and env values relative to `__dirname` (**the core checkout**). `web/`'s current
       resolver uses `process.cwd()` (**`web/`**) then `..`. A relative value like `../shared-data`
       therefore resolves to *two different directories* under the two implementations — same
@@ -165,9 +165,12 @@ management and surface.
 - [ ] **NFR2** **Upstream shape.** `origin` is `career-ops-hq/career-ops` with no fork, and `web/`
       is tracked (251 files) but **not** in `SYSTEM_PATHS` — so `update-system.mjs apply` will not
       clobber it, but `git pull` will conflict. All work stays on `feat/multi-profile-web`.
-- [ ] **NFR3** **Test baseline: 452 pass / 2 fail** (`apply-cv-resolver`, `explore-ai-dedup`,
-      both failing before any change). Ship must not exceed 2 failures. New logic gets tests in
-      `web/tests/lib/`.
+- [ ] **NFR3** **Test baseline: 486 pass / 2 fail** on web **0.10.0** (`apply-cv-resolver`,
+      `explore-ai-dedup`, both failing before any change). Ship must not exceed those 2. New logic
+      gets tests in `web/tests/lib/`.
+      *(Re-baselined after the 1.32.0 update: the first measurement, 452/2, was taken on web 0.9.0
+      before the fork brought web/ up to 0.10.0 — `update-system.mjs` cannot advance `web/`
+      because it is absent from `SYSTEM_PATHS`.)*
 - [ ] **NFR4** **Zero-cost default.** Profile switching adds no model calls. Jay shares usage
       limits with a TopstepX trading instance; scanning and switching stay zero-token.
 - [ ] **NFR5** **Backward compatible.** With no `roots.yml` and no `archetypes.yml`, the app
@@ -270,7 +273,7 @@ not visually bare today.
 ## Acceptance Criteria
 
 - [ ] **AC1** With no `roots.yml`/`archetypes.yml`, the app is byte-identical in behavior. Both switchers hidden.
-- [ ] **AC2** `careerOpsRoot()` resolves `CAREER_OPS_ROOT` → `CAREER_OPS_DATA_DIR` → `.career-ops-data` → `..`, matching `path-resolver.mjs`, with a test per branch.
+- [x] **AC2** `careerOpsRoot()` resolves `CAREER_OPS_ROOT` → `CAREER_OPS_DATA_DIR` → `.career-ops-data` → `..`, matching `path-resolver.mjs`, with a test per branch.
 - [ ] **AC3** Selecting a root changes tracker, reports, and CV together; no row from root A appears under root B.
 - [ ] **AC4** Selecting an archetype changes which `.tex` compiles on Generate PDF; the tracker is unchanged.
 - [ ] **AC5** A crafted request naming a filesystem path instead of a registry id is refused.
