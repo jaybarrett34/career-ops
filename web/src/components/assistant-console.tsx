@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Send, X, Loader2, Settings, RotateCcw, ArrowUpRight, Sparkles } from "lucide-react";
+import { Send, X, Loader2, Settings, RotateCcw, ArrowUpRight, Sparkles, Maximize2, Minimize2 } from "lucide-react";
 import { CoMark } from "@/components/co-mark";
 import { useJobs } from "@/components/jobs/job-store";
 import { usePipeline } from "@/components/pipeline/pipeline-provider";
@@ -17,6 +17,7 @@ import { dispatch, type ActionCtx, type DoneInfo } from "@/app/actions/registry"
 import { scoreNum } from "@/lib/format";
 import { pendingActOpenerStart } from "@/lib/act-envelope.mjs";
 import { cn } from "@/lib/cn";
+import { ChatTabs, type SessionMeta } from "@/components/chat-tabs";
 
 // ── message model: messages are PART arrays so a live worker card can render
 // inline next to text, both fed by the single JobsProvider store ──────────────
@@ -136,6 +137,12 @@ export function AssistantConsole() {
   const [open, setOpen] = useState(false);
   const [cliId, setCliId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
+  // Phase 7: multi-session tabs. `sessionId` is null until the first save, so a
+  // conversation the user never engages with never creates a file on disk.
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessions, setSessions] = useState<SessionMeta[]>([]);
+  const [expanded, setExpanded] = useState(false);
+  const savingRef = useRef(false);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const router = useRouter();
@@ -176,25 +183,107 @@ export function AssistantConsole() {
 
   // restore + persist conversation
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(CHAT_KEY);
-      const m = raw ? migrate(JSON.parse(raw)) : null;
-      if (m && m.length) setMessages(m);
-    } catch {
-      /* ignore */
-    }
+    let alive = true;
+    (async () => {
+      // Disk first. The legacy single-transcript localStorage key is the
+      // fallback AND the migration path: an existing conversation becomes the
+      // first tab on upgrade rather than being discarded.
+      try {
+        const list = await fetch("/api/chats").then((r) => r.json());
+        if (!alive) return;
+        setSessions(list.sessions ?? []);
+        if (list.sessions?.length) {
+          const newest = list.sessions[0];
+          const full = await fetch(`/api/chats?id=${encodeURIComponent(newest.id)}`).then((r) => r.json());
+          if (!alive) return;
+          if (full?.messages?.length) {
+            setMessages(migrate(full.messages) ?? []);
+            setSessionId(newest.id);
+            return;
+          }
+        }
+      } catch {
+        /* disk unavailable — fall through to localStorage */
+      }
+      try {
+        const raw = localStorage.getItem(CHAT_KEY);
+        const m = raw ? migrate(JSON.parse(raw)) : null;
+        if (alive && m && m.length) setMessages(m);
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      alive = false;
+    };
   }, []);
   useEffect(() => {
     if (!messages.length) return;
+    const serializable = messages
+      .slice(-30)
+      .map((m) => ({ role: m.role, parts: m.parts.filter((p) => p.type !== "confirm" || p.state !== "pending") }));
+    // Local copy stays: if the disk write fails the live transcript is still
+    // recoverable, and this is the path that worked before phase 7.
     try {
-      const serializable = messages
-        .slice(-30)
-        .map((m) => ({ role: m.role, parts: m.parts.filter((p) => p.type !== "confirm" || p.state !== "pending") }));
       localStorage.setItem(CHAT_KEY, JSON.stringify(serializable));
+    } catch {
+      /* private window, quota, etc. */
+    }
+    // Nothing worth a file until the user has actually said something — a bare
+    // greeting should not litter the chats directory.
+    if (!messages.some((m) => m.role === "user")) return;
+    // Debounced: a streaming reply updates state on every token, and one write
+    // per token would hammer the disk for no benefit.
+    const t = setTimeout(async () => {
+      if (savingRef.current) return;
+      savingRef.current = true;
+      try {
+        const res = await fetch("/api/chats", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: sessionId, messages: serializable }),
+        });
+        const body = await res.json();
+        if (res.ok && body.id) {
+          if (!sessionId) setSessionId(body.id);
+          const list = await fetch("/api/chats").then((r) => r.json());
+          setSessions(list.sessions ?? []);
+        }
+      } catch {
+        /* localStorage above already holds it */
+      } finally {
+        savingRef.current = false;
+      }
+    }, 1200);
+    return () => clearTimeout(t);
+  }, [messages, sessionId]);
+
+  async function openSession(id: string) {
+    if (id === sessionId) return;
+    try {
+      const full = await fetch(`/api/chats?id=${encodeURIComponent(id)}`).then((r) => r.json());
+      if (full?.messages) {
+        setMessages(migrate(full.messages) ?? []);
+        setSessionId(id);
+        // Confirm state is per-tab: a card answered in one conversation must not
+        // count as answered in another.
+        confirmRuns.current.clear();
+      }
+    } catch {
+      /* leave the current tab alone */
+    }
+  }
+
+  async function deleteSession(id: string) {
+    try {
+      await fetch(`/api/chats?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      const list = await fetch("/api/chats").then((r) => r.json());
+      setSessions(list.sessions ?? []);
+      if (id === sessionId) resetChat();
     } catch {
       /* ignore */
     }
-  }, [messages]);
+  }
 
   useEffect(() => {
     if (open && messages.length === 0) setMessages([{ role: "assistant", parts: [{ type: "text", text: GREETING }] }]);
@@ -423,7 +512,11 @@ export function AssistantConsole() {
   }
 
   function resetChat() {
+    // Starts a NEW session rather than erasing this one. Before tabs, "new chat"
+    // and "delete this chat" were the same button; they are not the same intent,
+    // and the destructive reading was never what the user meant.
     setMessages([{ role: "assistant", parts: [{ type: "text", text: GREETING }] }]);
+    setSessionId(null);
     confirmRuns.current.clear();
     try {
       localStorage.removeItem(CHAT_KEY);
@@ -490,7 +583,29 @@ export function AssistantConsole() {
       )}
 
       {open && (
-        <div className="fixed bottom-5 right-5 z-50 flex h-[600px] max-h-[80vh] w-[400px] max-w-[calc(100vw-2.5rem)] flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl">
+        <div
+          className={cn(
+            "fixed bottom-5 right-5 z-50 flex flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl",
+            // Docked vs detached. A plain size swap rather than a portal or a
+            // second window: the transcript, the in-flight workers and every
+            // confirm card keep their React state, so expanding mid-run loses
+            // nothing.
+            "transition-[width,height] duration-200 ease-out motion-reduce:transition-none",
+            // Both branches use the SAME shape — a fixed w/h plus a max-w/max-h
+            // clamp — mirroring the docked pattern that already shipped.
+            //
+            // A note for anyone debugging sizing here: a NEW arbitrary value
+            // (w-[900px], h-[860px]) needs Turbopack to regenerate the
+            // stylesheet. Until it does, the class lands on the element and
+            // computes to nothing, so the panel keeps its old size while the
+            // button already reads "Dock" — which looks exactly like a broken
+            // conditional and is not one. `rm -rf .next` and restart before
+            // suspecting the JSX.
+            expanded
+              ? "h-[860px] max-h-[90vh] w-[900px] max-w-[calc(100vw-2.5rem)]"
+              : "h-[600px] max-h-[80vh] w-[400px] max-w-[calc(100vw-2.5rem)]",
+          )}
+        >
           <header className="flex items-center gap-2.5 border-b border-border px-4 py-3">
             <CoMark size={26} />
             <div className="flex-1">
@@ -500,10 +615,28 @@ export function AssistantConsole() {
             <Button variant="ghost" size="icon" onClick={resetChat} className="text-muted" aria-label="New chat" title="New chat">
               <RotateCcw className="size-4" />
             </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setExpanded((v) => !v)}
+              className="text-muted"
+              aria-label={expanded ? "Dock assistant" : "Expand assistant"}
+              title={expanded ? "Dock" : "Expand"}
+            >
+              {expanded ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+            </Button>
             <Button variant="ghost" size="icon" onClick={() => setOpen(false)} className="text-muted" aria-label="Close assistant">
               <X className="size-4" />
             </Button>
           </header>
+
+          <ChatTabs
+            sessions={sessions}
+            activeId={sessionId}
+            onSelect={openSession}
+            onNew={resetChat}
+            onDelete={deleteSession}
+          />
 
           <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
             {messages.map((m, i) => {
