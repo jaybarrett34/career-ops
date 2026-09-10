@@ -18,6 +18,24 @@
 
 <hr>
 
+> ## This is a fork
+>
+> **Upstream:** [`career-ops-hq/career-ops`](https://github.com/career-ops-hq/career-ops) · **This fork:** `jaybarrett34/career-ops`
+>
+> Everything below this box is upstream's. This box, and [`FORK.md`](FORK.md), are the only
+> additions to this file — kept to one block so upstream pulls conflict here and nowhere else.
+>
+> **What this fork adds:** layered multi-profile support for the web UI — a root switcher
+> (which person's data) and an orthogonal archetype overlay (which CV and targeting flavor
+> within that person), plus selectable per-run model routing and multi-session chat tabs.
+> See [`docs/prd/multi-profile-web.md`](docs/prd/multi-profile-web.md) for the spec and
+> [`FORK.md`](FORK.md) for what is upstreamable and what is local.
+>
+> **No personal data lives here.** Profiles, CVs, trackers and reports are gitignored; each
+> person's data belongs in its own private repository that this checkout points at via
+> `.career-ops-data`. See [`config/roots.example.yml`](config/roots.example.yml).
+
+
 <p align="center">
   <a href="HIRED.md"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fsantifer%2Fcareer-ops%2Fmain%2Fdocs%2Fhired-count.json&query=%24.count&label=%F0%9F%8E%89%20HIRED%20WITH%20CAREER-OPS&suffix=%20verified&color=2ea44f&style=for-the-badge&labelColor=2b3137" alt="Hired with career-ops: verified count"></a>
 </p>

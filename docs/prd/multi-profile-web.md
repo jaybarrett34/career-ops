@@ -27,19 +27,19 @@ a separate repo with no way to reach it. Today, switching either means editing f
 ## The two layers (orthogonal by construction)
 
 ```
-Layer 1 — ROOT       [ Jay ▾ ]          → careerOpsRoot() → ALL user-layer files
-Layer 2 — ARCHETYPE  [ ai_engineer ▾ ]  → overlay        → targeting + CV only
+Layer 1 — ROOT [ Jay ▾ ] → careerOpsRoot() → ALL user-layer files
+Layer 2 — ARCHETYPE [ ai_engineer ▾ ] → overlay → targeting + CV only
 ```
 
-| | Root switch changes | Archetype switch changes |
+| | Root switch changes it | Archetype switch changes it |
 |---|---|---|
-| `cv.md`, `config/profile.yml`, `modes/_profile.md` | ✅ | ❌ |
-| `data/applications.md` (tracker) | ✅ separate | ❌ shared |
-| `data/scan-history.tsv` | ✅ separate | ❌ shared |
-| `reports/` | ✅ separate | ❌ shared |
-| `portals.yml` targeting | ✅ separate | ⚠️ overlay only (see FR6) |
-| which `.tex` compiles | ✅ | ✅ |
-| scoring keyword weights | ✅ | ✅ |
+| `cv.md`, `config/profile.yml`, `modes/_profile.md` | yes | no |
+| `data/applications.md` (tracker) | yes, separate per person | no, shared |
+| `data/scan-history.tsv` | yes, separate per person | no, shared |
+| `reports/` | yes, separate per person | no, shared |
+| `portals.yml` targeting | yes, separate per person | overlay only, never rewritten (FR6) |
+| which `.tex` compiles | yes | yes |
+| scoring keyword weights | yes | yes |
 
 **Invariant the design must not break** (from `api/profile/route.ts`):
 > *"The web orchestrates the real file — no parallel store."*
@@ -54,69 +54,69 @@ database, cache, or mirror of user data.
 ### Functional — Layer 1: Root switcher
 
 - [x] **FR1** `web/`'s `careerOpsRoot()` honors the core's full resolution order: `CAREER_OPS_ROOT`
-      → `CAREER_OPS_DATA_DIR` → `.career-ops-data` marker file → repo default. **It currently
-      honors only the first**, diverging from `path-resolver.mjs`. This is a standalone bug fix
-      and ships first, independently.
-- [x] **FR1a** ⚠️ **Resolution base — the subtle half of FR1.** `path-resolver.mjs` resolves the
-      marker and env values relative to `__dirname` (**the core checkout**). `web/`'s current
-      resolver uses `process.cwd()` (**`web/`**) then `..`. A relative value like `../shared-data`
-      therefore resolves to *two different directories* under the two implementations — same
-      string, different base, silently different data root.
-      **Required:** resolve relative to the **core root**, identically to `path-resolver.mjs`.
-      **Preferred implementation:** import `getCareerOpsRoot` from the core rather than
-      re-implementing it — it is the same repository, and two implementations of one rule is how
-      this diverged in the first place. **Spike first:** confirm the import survives Next's
-      bundler; `career-ops.ts`'s `rootScript()` carries a `turbopackIgnore` comment precisely
-      because Turbopack statically traces core paths as module imports. If the import cannot cross
-      that boundary cleanly, port the function verbatim with a comment naming `path-resolver.mjs`
-      as the source of truth and a test asserting the two agree.
+ → `CAREER_OPS_DATA_DIR` → `.career-ops-data` marker file → repo default. **It currently
+ honors only the first**, diverging from `path-resolver.mjs`. This is a standalone bug fix
+ and ships first, independently.
+- [x] **FR1a** **Resolution base — the subtle half of FR1.** `path-resolver.mjs` resolves the
+ marker and env values relative to `__dirname` (**the core checkout**). `web/`'s current
+ resolver uses `process.cwd()` (**`web/`**) then `..`. A relative value like `../shared-data`
+ therefore resolves to *two different directories* under the two implementations — same
+ string, different base, silently different data root.
+ **Required:** resolve relative to the **core root**, identically to `path-resolver.mjs`.
+ **Preferred implementation:** import `getCareerOpsRoot` from the core rather than
+ re-implementing it — it is the same repository, and two implementations of one rule is how
+ this diverged in the first place. **Spike first:** confirm the import survives Next's
+ bundler; `career-ops.ts`'s `rootScript()` carries a `turbopackIgnore` comment precisely
+ because Turbopack statically traces core paths as module imports. If the import cannot cross
+ that boundary cleanly, port the function verbatim with a comment naming `path-resolver.mjs`
+ as the source of truth and a test asserting the two agree.
 - [ ] **FR2** A registry of known roots lives at `config/roots.yml` (gitignored, user layer):
-      `{id, label, path, enabled}`. Absent file → single implicit root = today's behavior.
-      **The registry is hand-edited only. The web app never writes a path into it** — not now, and
-      no "Add root" form later. FR3 closes the read side of the traversal primitive; this closes
-      the write side. Adding a root is a deliberate act of editing a file on disk.
+ `{id, label, path, enabled}`. Absent file → single implicit root = today's behavior.
+ **The registry is hand-edited only. The web app never writes a path into it** — not now, and
+ no "Add root" form later. FR3 closes the read side of the traversal primitive; this closes
+ the write side. Adding a root is a deliberate act of editing a file on disk.
 - [ ] **FR3** The active root is **server-side session state**, not a client value. A client that
-      can name an arbitrary path is a directory-traversal read primitive against the user's disk.
+ can name an arbitrary path is a directory-traversal read primitive against the user's disk.
 - [ ] **FR4** Every root in the registry is validated on selection: path exists, is a directory,
-      and contains at least one of `cv.md` / `config/profile.yml`. Invalid → refuse with a clear
-      message, keep the previous root.
+ and contains at least one of `cv.md` / `config/profile.yml`. Invalid → refuse with a clear
+ message, keep the previous root.
 
 ### Functional — Layer 2: Archetype overlay
 
 - [ ] **FR5** Archetypes are read from the user layer, never hardcoded in `web/`. Source of truth
-      is `config/archetypes.yml` (gitignored): `{id, label, tex, keywords[], model?, score?}`.
-      Absent → the switcher hides itself entirely and behavior is exactly today's.
+ is `config/archetypes.yml` (gitignored): `{id, label, tex, keywords[], model?, score?}`.
+ Absent → the switcher hides itself entirely and behavior is exactly today's.
 - [ ] **FR6** Selecting an archetype overlays **targeting and CV only**: which `.tex` compiles,
-      which keywords weight scoring, which CV a report links. It never rewrites `portals.yml`,
-      the tracker, or `modes/_profile.md`.
+ which keywords weight scoring, which CV a report links. It never rewrites `portals.yml`,
+ the tracker, or `modes/_profile.md`.
 - [ ] **FR7** The active archetype is recorded on every artifact it produces, in **machine-findable
-      form**, so a later reader can tell which flavor generated it:
-      - **Tracker:** a *tagged* segment in the Notes column — `archetype=ai_engineer` — matching the
-        existing `via=Agency` convention (`merge-tracker.mjs`). Never prose; a parser must be able
-        to find it. Written through `set-status.mjs` / the TSV path, never by hand-editing the table.
-      - **Reports:** a named key inside the existing `## Machine Summary` YAML block, not loose
-        front-matter.
+ form**, so a later reader can tell which flavor generated it:
+ - **Tracker:** a *tagged* segment in the Notes column — `archetype=ai_engineer` — matching the
+ existing `via=Agency` convention (`merge-tracker.mjs`). Never prose; a parser must be able
+ to find it. Written through `set-status.mjs` / the TSV path, never by hand-editing the table.
+ - **Reports:** a named key inside the existing `## Machine Summary` YAML block, not loose
+ front-matter.
 
 ### Functional — Model routing (Fable)
 
 - [ ] **FR8** `claudeCliArgs()` gains an optional `--model` passthrough. Fable is **not** a new
-      `KNOWN` CLI entry — it rides the existing, audited Claude permission path, so
-      `clis-permissions.test.mjs`'s guarantee is unchanged.
+ `KNOWN` CLI entry — it rides the existing, audited Claude permission path, so
+ `clis-permissions.test.mjs`'s guarantee is unchanged.
 - [ ] **FR9** **No model name is hardcoded in `web/`.** `modes/_shared.md` states the tier→model
-      table is *"the only place model/provider names appear."* Web reads a model **string** from
-      user-layer config and passes it through opaquely.
+ table is *"the only place model/provider names appear."* Web reads a model **string** from
+ user-layer config and passes it through opaquely.
 - [ ] **FR10** Model is selectable per run and defaults to unset (current behavior). Fable is
-      opt-in for **building** pipelines (authoring, refactoring, judgment) — **not** the default
-      for **running** them over hundreds of scan hits.
+ opt-in for **building** pipelines (authoring, refactoring, judgment) — **not** the default
+ for **running** them over hundreds of scan hits.
 
 ### Functional — UI
 
 - [ ] **FR11** 3–5 `reactbits.dev` components, each where **motion carries information**, not
-      decoration. Candidates: `AnimatedList` (pipeline inbox arrival/removal), `SpotlightCard`
-      (job cards), `CountUp` (stat tiles), `GradientText` (active-profile indicator).
+ decoration. Candidates: `AnimatedList` (pipeline inbox arrival/removal), `SpotlightCard`
+ (job cards), `CountUp` (stat tiles), `GradientText` (active-profile indicator).
 - [ ] **FR12** Any new animation respects `prefers-reduced-motion`.
 - [ ] **FR13** The active root + archetype are visible on **every** page, not just a settings
-      screen. Acting on the wrong person's data is the failure mode this prevents.
+ screen. Acting on the wrong person's data is the failure mode this prevents.
 
 ### Functional — Chat router with tabs (Phase 7)
 
@@ -128,66 +128,66 @@ behind confirm cards. **Message routing to Claude Code is solved.** What is miss
 management and surface.
 
 - [ ] **FR16** **Multiple concurrent conversations as tabs.** Today a single `localStorage` key
-      (`career-ops:chat`) holds one transcript; a new topic destroys the old one. Tabs give each
-      conversation its own transcript, its own in-flight workers, and its own scroll position.
-- [ ] **FR17** ⭐ **Each chat tab binds to a profile (root + archetype).** This is where Phase 7
-      and Phases 2–3 reinforce each other rather than merely coexisting: a tab labeled
-      *Jay · ai_engineer* and a tab labeled *Mom · operations* each act on their own data root.
-      The bound profile is shown in the tab, and **the tab's messages execute against that
-      profile**, so a message typed in one tab can never touch the other's tracker.
+ (`career-ops:chat`) holds one transcript; a new topic destroys the old one. Tabs give each
+ conversation its own transcript, its own in-flight workers, and its own scroll position.
+- [ ] **FR17** **Each chat tab binds to a profile (root + archetype).** This is where Phase 7
+ and Phases 2–3 reinforce each other rather than merely coexisting: a tab labeled
+ *Jay · ai_engineer* and a tab labeled *Mom · operations* each act on their own data root.
+ The bound profile is shown in the tab, and **the tab's messages execute against that
+ profile**, so a message typed in one tab can never touch the other's tracker.
 - [ ] **FR18** **Detached / popup surface**, claude.ai-shaped: the console can pop out to a wide
-      reading layout for long conversations, and dock back to the corner for quick actions.
-      State survives the transition — no reload, no lost transcript.
+ reading layout for long conversations, and dock back to the corner for quick actions.
+ State survives the transition — no reload, no lost transcript.
 - [ ] **FR19** **Transcripts persist to disk**, not just `localStorage`:
-      `.career-ops-web/chats/{id}.json` (gitignored, already the runs directory's home). Survives
-      cleared browser data, and is readable by the CLI itself — which matters, because the agent
-      is asked to read `.career-ops-web/runs/{id}.md` today and this is the same pattern.
+ `.career-ops-web/chats/{id}.json` (gitignored, already the runs directory's home). Survives
+ cleared browser data, and is readable by the CLI itself — which matters, because the agent
+ is asked to read `.career-ops-web/runs/{id}.md` today and this is the same pattern.
 - [ ] **FR20** **The confirm-gate is per-tab and non-negotiable.** Every write action
-      (`setProfile`, `setStatus`, `generatePdf`, `apply`) keeps its existing confirm card in every
-      tab. Tabs multiply conversations, never permissions. A background tab may **never** complete
-      a write the user is not looking at.
+ (`setProfile`, `setStatus`, `generatePdf`, `apply`) keeps its existing confirm card in every
+ tab. Tabs multiply conversations, never permissions. A background tab may **never** complete
+ a write the user is not looking at.
 - [ ] **FR21** **Model selection is per-tab** and composes with FR8–FR10: a *build the pipeline*
-      tab can run Fable while a *triage 500 hits* tab runs the cheap tier, concurrently.
+ tab can run Fable while a *triage 500 hits* tab runs the cheap tier, concurrently.
 
 ### Functional — Claude-in-Chrome experiment slot
 
 - [ ] **FR14** A documented, **disabled-by-default** slot for a Chrome-driven LinkedIn reader,
-      with the hypothesis stated plainly: the extension reuses the user's authenticated session
-      where headless Playwright gets walled.
+ with the hypothesis stated plainly: the extension reuses the user's authenticated session
+ where headless Playwright gets walled.
 - [ ] **FR15** Ships as documentation + a stub interface, **not** a working scraper. See
-      "Open Questions" for the ToS position.
+ "Open Questions" for the ToS position.
 
 ### Non-Functional
 
 - [ ] **NFR1** **Data contract.** All new state in gitignored user-layer paths
-      (`config/roots.yml`, `config/archetypes.yml`, `config/.active-profile.json`). Nothing user-
-      specific enters the system layer.
+ (`config/roots.yml`, `config/archetypes.yml`, `config/.active-profile.json`). Nothing user-
+ specific enters the system layer.
 - [ ] **NFR2** **Upstream shape.** `origin` is `career-ops-hq/career-ops` with no fork, and `web/`
-      is tracked (251 files) but **not** in `SYSTEM_PATHS` — so `update-system.mjs apply` will not
-      clobber it, but `git pull` will conflict. All work stays on `feat/multi-profile-web`.
+ is tracked (251 files) but **not** in `SYSTEM_PATHS` — so `update-system.mjs apply` will not
+ clobber it, but `git pull` will conflict. All work stays on `feat/multi-profile-web`.
 - [ ] **NFR3** **Test baseline: 486 pass / 2 fail** on web **0.10.0** (`apply-cv-resolver`,
-      `explore-ai-dedup`, both failing before any change). Ship must not exceed those 2. New logic
-      gets tests in `web/tests/lib/`.
-      *(Re-baselined after the 1.32.0 update: the first measurement, 452/2, was taken on web 0.9.0
-      before the fork brought web/ up to 0.10.0 — `update-system.mjs` cannot advance `web/`
-      because it is absent from `SYSTEM_PATHS`.)*
+ `explore-ai-dedup`, both failing before any change). Ship must not exceed those 2. New logic
+ gets tests in `web/tests/lib/`.
+ *(Re-baselined after the 1.32.0 update: the first measurement, 452/2, was taken on web 0.9.0
+ before the fork brought web/ up to 0.10.0 — `update-system.mjs` cannot advance `web/`
+ because it is absent from `SYSTEM_PATHS`.)*
 - [ ] **NFR4** **Zero-cost default.** Profile switching adds no model calls. Jay shares usage
-      limits with a TopstepX trading instance; scanning and switching stay zero-token.
+ limits with a TopstepX trading instance; scanning and switching stay zero-token.
 - [ ] **NFR5** **Backward compatible.** With no `roots.yml` and no `archetypes.yml`, the app
-      behaves exactly as it does today. Both switchers hide themselves.
+ behaves exactly as it does today. Both switchers hide themselves.
 
 ---
 
 ## User Stories
 
 - As **Jay**, I want to switch to `ai_engineer` and have Generate PDF compile `ai_engineer.tex`,
-  so I stop hand-picking the right file per application.
+ so I stop hand-picking the right file per application.
 - As **Jay**, I want to switch to a second person's root and see only their tracker, so I never
-  apply to a job under the wrong identity.
+ apply to a job under the wrong identity.
 - As **Jay**, I want Fable available for *authoring* a pipeline but not for *running* it over 500
-  scan hits, so a judgment task gets a strong model and a bulk task doesn't burn shared limits.
+ scan hits, so a judgment task gets a strong model and a bulk task doesn't burn shared limits.
 - As **Jay**, I want the active person and archetype visible on every screen, so I can't act on
-  the wrong data by accident.
+ the wrong data by accident.
 
 ---
 
@@ -228,15 +228,15 @@ management and surface.
 
 ```
 Request → active-profile.ts (server session)
-            ├── root id      → roots.ts      → validated absolute path
-            │                                       ↓
-            │                                 careerOpsRoot()
-            │                                       ↓
-            │                    ALL user-layer reads (cv, tracker, reports, portals)
-            │
-            └── archetype id → archetypes.ts → overlay { tex, keywords, model? }
-                                                    ↓
-                                    cv-selection.mjs   scoring    claudeCliArgs(--model)
+ ├── root id → roots.ts → validated absolute path
+ │ ↓
+ │ careerOpsRoot()
+ │ ↓
+ │ ALL user-layer reads (cv, tracker, reports, portals)
+ │
+ └── archetype id → archetypes.ts → overlay { tex, keywords, model? }
+ ↓
+ cv-selection.mjs scoring claudeCliArgs(--model)
 ```
 
 ### Dependencies
@@ -321,12 +321,12 @@ Costs roughly a day over the naive version. Worth it.
 *(OQ1 and OQ4 were open in the first draft and are now decided — see "Decisions taken" below.)*
 
 - [ ] **OQ2 — Fable default.** Confirm: Fable selectable for *building* pipelines, never the
-      default for bulk *running*. Your limits are shared with the trading instance.
+ default for bulk *running*. Your limits are shared with the trading instance.
 - [ ] **OQ3 — Animation dependency.** Adopt Framer Motion (~50KB, unlocks most reactbits
-      components as written), or hand-port to CSS and add nothing?
+ components as written), or hand-port to CSS and add nothing?
 - [ ] **OQ5 — Core update.** `update-system.mjs` reports **1.31.0 → 1.32.0** available
-      (`system-files-changed`). Recommend applying **before** this work, not during — it rewrites
-      system files by raw checkout, not merge. Apply now, or after?
+ (`system-files-changed`). Recommend applying **before** this work, not during — it rewrites
+ system files by raw checkout, not merge. Apply now, or after?
 
 ---
 
@@ -334,13 +334,13 @@ Costs roughly a day over the naive version. Worth it.
 
 | Phase | Content | Independently shippable |
 |---|---|---|
-| **1** | FR1 root-resolution bug fix + tests | ✅ Yes — genuinely upstream-shaped, fixes real divergence |
-| **2** | FR2–FR4 root registry + switcher | ✅ Yes |
-| **3** | FR5–FR7 archetype overlay | ✅ Yes |
-| **4** | FR8–FR10 model routing | ✅ Yes |
-| **5** | FR11–FR13 UI components | ✅ Yes |
-| **6** | FR14–FR15 Chrome slot (docs) | ✅ Yes |
-| **7** | FR16–FR21 chat tabs + detached surface + per-tab profile/model | ✅ Yes — but lands *after* Phases 2–3, since FR17 binds tabs to profiles |
+| **1** | FR1 root-resolution bug fix + tests | OK Yes — genuinely upstream-shaped, fixes real divergence |
+| **2** | FR2–FR4 root registry + switcher | OK Yes |
+| **3** | FR5–FR7 archetype overlay | OK Yes |
+| **4** | FR8–FR10 model routing | OK Yes |
+| **5** | FR11–FR13 UI components | OK Yes |
+| **6** | FR14–FR15 Chrome slot (docs) | OK Yes |
+| **7** | FR16–FR21 chat tabs + detached surface + per-tab profile/model | OK Yes — but lands *after* Phases 2–3, since FR17 binds tabs to profiles |
 
 Phase 1 is worth doing regardless of whether the rest is approved.
 
