@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { careerOpsRoot } from "@/lib/career-ops";
 import { atomicWriteWithBackup } from "@/lib/core/safe-write";
+import { withActiveProfile } from "@/lib/core/with-profile";
 
 function cvPath() {
   return path.join(careerOpsRoot(), "cv.md");
@@ -10,7 +11,7 @@ function cvPath() {
 
 const MAX_CV_BYTES = 200_000;
 
-export async function GET() {
+async function handleGET() {
   try {
     return NextResponse.json({ content: fs.readFileSync(cvPath(), "utf8"), exists: true });
   } catch {
@@ -18,7 +19,7 @@ export async function GET() {
   }
 }
 
-export async function POST(req: Request) {
+async function handlePOST(req: Request) {
   let body: { content?: string };
   try {
     body = await req.json();
@@ -40,3 +41,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "write failed" }, { status: 500 });
   }
 }
+
+// Establishes the per-request profile scope; see lib/core/with-profile.ts.
+export const GET = withActiveProfile(handleGET);
+export const POST = withActiveProfile(handlePOST);

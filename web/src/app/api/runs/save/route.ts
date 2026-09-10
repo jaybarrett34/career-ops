@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import fs from "node:fs";
 import path from "node:path";
 import { careerOpsRoot } from "@/lib/career-ops";
+import { withActiveProfile } from "@/lib/core/with-profile";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,7 +20,7 @@ type Body = {
 
 // Persist a finished worker's log as markdown under a web-managed dir so the CLI
 // assistant can read past runs ("what did we find on that Anthropic role?").
-export async function POST(req: Request) {
+async function handlePOST(req: Request) {
   let b: Body;
   try {
     b = await req.json();
@@ -57,3 +58,6 @@ ${b.output || ""}
     return NextResponse.json({ error: "write failed" }, { status: 500 });
   }
 }
+
+// Establishes the per-request profile scope; see lib/core/with-profile.ts.
+export const POST = withActiveProfile(handlePOST);

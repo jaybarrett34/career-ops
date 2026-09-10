@@ -4,6 +4,7 @@ import fs from "node:fs";
 import { careerOpsRoot, rootScript } from "@/lib/career-ops";
 import { canonicalizeStatus } from "@/lib/core/states";
 import { parseCliJson, trackerRowArg, clientErrorMessage } from "@/lib/status-cli.mjs";
+import { withActiveProfile } from "@/lib/core/with-profile";
 
 export const runtime = "nodejs"; // delegates to the core CLI via child_process
 
@@ -104,7 +105,7 @@ function runSetStatus(args: string[]): Promise<CliResult> {
 // of the document, and can contain a brace of its own — so status-cli.mjs reads
 // the document from the end rather than from the first `{`.
 
-export async function POST(req: Request) {
+async function handlePOST(req: Request) {
   let body: { n?: string; status?: string };
   try {
     body = await req.json();
@@ -220,3 +221,6 @@ export async function POST(req: Request) {
     statusLogged: parsed.statusLogged === true,
   });
 }
+
+// Establishes the per-request profile scope; see lib/core/with-profile.ts.
+export const POST = withActiveProfile(handlePOST);

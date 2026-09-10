@@ -1,6 +1,7 @@
 import { spawnHeadlessCli } from "@/lib/spawn-cli.mjs";
 import { resolveCli } from "@/lib/clis";
 import { careerOpsRoot, readMemory, doctorState } from "@/lib/career-ops";
+import { withActiveProfile } from "@/lib/core/with-profile";
 
 export const runtime = "nodejs"; // child_process (spawn) requires the Node runtime
 export const dynamic = "force-dynamic";
@@ -44,7 +45,7 @@ Keep replies short, warm, and useful. Don't dump raw files or narrate internal d
 
 type Msg = { role: "user" | "assistant"; content: string };
 
-export async function POST(req: Request) {
+async function handlePOST(req: Request) {
   let body: { message?: string; cliId?: string; history?: Msg[]; pageContext?: string };
   try {
     body = await req.json();
@@ -213,3 +214,6 @@ export async function POST(req: Request) {
     },
   });
 }
+
+// Establishes the per-request profile scope; see lib/core/with-profile.ts.
+export const POST = withActiveProfile(handlePOST);

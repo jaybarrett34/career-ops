@@ -1,10 +1,11 @@
 import { notFound } from "next/navigation";
 import { readReport, findApplication, pdfReadyForReport, trackerCanDelete } from "@/lib/career-ops";
 import { ReportView } from "@/components/report-view";
+import { withActiveProfile } from "@/lib/core/with-profile";
 
 export const dynamic = "force-dynamic";
 
-export default async function ReportPage({ params }: { params: Promise<{ id: string }> }) {
+async function ReportPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const app = findApplication(id);
   const report = readReport(id);
@@ -20,3 +21,6 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
     />
   );
 }
+
+// Establishes the per-request profile scope; see lib/core/with-profile.ts.
+export default withActiveProfile(ReportPage);

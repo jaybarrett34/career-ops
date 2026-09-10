@@ -3,6 +3,7 @@ import path from "node:path";
 import { atomicWrite } from "@/lib/core/safe-write";
 import { CHANNELS, isRealISODate, localISODate } from "@/lib/followups";
 import { followupsLogPath, withFollowupsWrite, followupsWriteError } from "@/lib/followups-server";
+import { withActiveProfile } from "@/lib/core/with-profile";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,7 +27,7 @@ function cell(v: unknown, max?: number): string {
 
 const TABLE_HEADER = "| num | appNum | date | company | role | channel | contact | notes |\n|---|---|---|---|---|---|---|---|\n";
 
-export async function POST(req: Request) {
+async function handlePOST(req: Request) {
   let body: {
     appNum?: string | number;
     num?: string | number; // legacy alias for appNum (old home-card payload)
@@ -108,7 +109,7 @@ export async function POST(req: Request) {
 // from the history panel). Only the matching table row is dropped; every other
 // byte of the file (header, other rows, legacy bullets) is preserved. Legacy
 // bullets carry no num and cannot be deleted here.
-export async function DELETE(req: Request) {
+async function handleDELETE(req: Request) {
   let body: { num?: string | number };
   try {
     body = (await req.json()) as { num?: string | number };
@@ -137,3 +138,7 @@ export async function DELETE(req: Request) {
     return followupsWriteError(e, "delete failed");
   }
 }
+
+// Establishes the per-request profile scope; see lib/core/with-profile.ts.
+export const POST = withActiveProfile(handlePOST);
+export const DELETE = withActiveProfile(handleDELETE);

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { pipelineSummary } from "@/lib/career-ops";
 import { canonStatus, scoreNum } from "@/lib/format";
 import { cumulativeTiles } from "@/lib/funnel-tiles.mjs";
+import { withActiveProfile } from "@/lib/core/with-profile";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,7 @@ const STAGES: { key: string; label: string }[] = [
   { key: "DISCARDED", label: "Discarded" },
 ];
 
-export default function Analytics() {
+function Analytics() {
   const { applications } = pipelineSummary();
   const total = applications.length;
 
@@ -154,3 +155,6 @@ function Bar({
     </div>
   );
 }
+
+// Establishes the per-request profile scope; see lib/core/with-profile.ts.
+export default withActiveProfile(Analytics);

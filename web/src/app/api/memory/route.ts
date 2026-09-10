@@ -1,17 +1,18 @@
 import { NextResponse } from "next/server";
 import { readMemory, rememberFact } from "@/lib/career-ops";
+import { withActiveProfile } from "@/lib/core/with-profile";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+async function handleGET() {
   return NextResponse.json({ memory: readMemory() });
 }
 
 // Append a durable fact the assistant learned about the user. Written to the
 // CANONICAL modes/_profile.md (single source of truth) so the CLI/TUI see it too
 // — never a web-only memory store.
-export async function POST(req: Request) {
+async function handlePOST(req: Request) {
   let b: { fact?: string };
   try {
     b = await req.json();
@@ -25,3 +26,7 @@ export async function POST(req: Request) {
   if (result === "error") return NextResponse.json({ error: "write failed" }, { status: 500 });
   return NextResponse.json({ ok: true, deduped: result === "deduped" });
 }
+
+// Establishes the per-request profile scope; see lib/core/with-profile.ts.
+export const GET = withActiveProfile(handleGET);
+export const POST = withActiveProfile(handlePOST);

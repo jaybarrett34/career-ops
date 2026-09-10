@@ -5,6 +5,7 @@ import * as yaml from "js-yaml";
 import { careerOpsRoot, rootScript } from "@/lib/career-ops";
 import { atomicWriteWithBackup } from "@/lib/core/safe-write";
 import { PROFILE_CADENCE_KEYS, type ProfileCadenceKey } from "@/lib/followups";
+import { withActiveProfile } from "@/lib/core/with-profile";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -66,7 +67,7 @@ async function readCoreDefaults(): Promise<Partial<Record<ProfileCadenceKey, num
   }
 }
 
-export async function GET() {
+async function handleGET() {
   const file = path.join(careerOpsRoot(), "config", "profile.yml");
   const overrides: Partial<Record<ProfileCadenceKey, number>> = {};
   if (fs.existsSync(file)) {
@@ -90,7 +91,7 @@ export async function GET() {
   return Response.json({ defaults: defaults ?? {}, defaultsAvailable: defaults !== null, overrides, effective });
 }
 
-export async function POST(req: Request) {
+async function handlePOST(req: Request) {
   let body: Record<string, unknown>;
   try {
     body = (await req.json()) as Record<string, unknown>;
@@ -143,3 +144,7 @@ export async function POST(req: Request) {
   }
   return Response.json({ ok: true, followup_cadence: merged.followup_cadence });
 }
+
+// Establishes the per-request profile scope; see lib/core/with-profile.ts.
+export const GET = withActiveProfile(handleGET);
+export const POST = withActiveProfile(handlePOST);

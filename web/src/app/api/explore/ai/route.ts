@@ -5,6 +5,7 @@ import path from "node:path";
 import { resolveCli } from "@/lib/clis";
 import { careerOpsRoot, readMemory } from "@/lib/career-ops";
 import { assembleDedupContext } from "@/lib/core/discover";
+import { withActiveProfile } from "@/lib/core/with-profile";
 
 // AI search orchestrates modes/discover.md by running the USER'S configured CLI
 // headless (CLI-agnostic, like the assistant). Web hunting is slow → generous
@@ -130,7 +131,7 @@ Follow modes/discover.md exactly. You are running headless for the web:
 - DEDUP: skip anything already known below; don't re-propose the user's existing companies.
 `;
 
-export async function POST(req: Request) {
+async function handlePOST(req: Request) {
   let body: { query?: string; cliId?: string };
   try {
     body = await req.json();
@@ -488,3 +489,6 @@ export async function POST(req: Request) {
     },
   });
 }
+
+// Establishes the per-request profile scope; see lib/core/with-profile.ts.
+export const POST = withActiveProfile(handlePOST);

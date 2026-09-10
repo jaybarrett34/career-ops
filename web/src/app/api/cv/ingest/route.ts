@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { resolveCli } from "@/lib/clis";
 import { careerOpsRoot } from "@/lib/career-ops";
+import { withActiveProfile } from "@/lib/core/with-profile";
 
 // Parse a CV (pasted text or an uploaded PDF) into clean cv.md markdown by running
 // the USER'S OWN CLI headless — the web never ships a heavyweight parser, and the
@@ -57,7 +58,7 @@ ${source}`;
 const TEXT_SRC = (t: string) => `SOURCE (the user's CV, pasted as text — convert it):\n"""\n${t.slice(0, 24000)}\n"""`;
 const FILE_SRC = (p: string) => `SOURCE: the user's CV is the file at this local path — READ it with your file/Read tool, then convert it:\n${p}`;
 
-export async function POST(req: Request) {
+async function handlePOST(req: Request) {
   const ctype = req.headers.get("content-type") || "";
   let cliId = "";
   let promptSource = "";
@@ -232,3 +233,6 @@ function cleanupTemp(file: string) {
     /* best-effort */
   }
 }
+
+// Establishes the per-request profile scope; see lib/core/with-profile.ts.
+export const POST = withActiveProfile(handlePOST);

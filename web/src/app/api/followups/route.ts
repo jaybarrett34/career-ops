@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import fs from "node:fs";
 import { careerOpsRoot, rootScript } from "@/lib/career-ops";
 import { selectDueFollowups, pickNextUpcoming } from "@/lib/core/followup-view.mjs";
+import { withActiveProfile } from "@/lib/core/with-profile";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,7 +12,7 @@ export const dynamic = "force-dynamic";
 // reimplement the cadence logic, we read its verdict (mirrors /api/doctor).
 // Default: capped list for the home card. `?full=1`: the complete cadence
 // (entries + metadata + cadenceConfig) for the /followups tracker page.
-export async function GET(req: Request) {
+async function handleGET(req: Request) {
   const full = new URL(req.url).searchParams.get("full") === "1";
   const script = rootScript("followup-cadence");
   if (!fs.existsSync(script)) return Response.json({ available: false, metadata: null, entries: [], nextUpcoming: null });
@@ -41,3 +42,6 @@ export async function GET(req: Request) {
     return Response.json({ available: false, metadata: null, entries: [], nextUpcoming: null });
   }
 }
+
+// Establishes the per-request profile scope; see lib/core/with-profile.ts.
+export const GET = withActiveProfile(handleGET);
