@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Bookmark, BookmarkCheck, Loader2, X } from "lucide-react";
 import type { InboxJob } from "@/lib/career-ops";
-import type { AtsSource } from "@/lib/explore";
+import type { DiscoverSource } from "@/lib/explore";
 import { ATS_LABEL } from "@/lib/explore";
 import { Badge } from "@/components/ui/badge";
 import { CompanyLogo } from "@/components/company-logo";
@@ -35,7 +35,7 @@ export function TriageRow({
   onSkip,
 }: {
   job: InboxJob;
-  source: AtsSource | null;
+  source: DiscoverSource | null;
   age: number | null;
   scored?: RowScore;
   selected: boolean;

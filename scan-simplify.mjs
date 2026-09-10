@@ -75,7 +75,8 @@ function usage() {
   node scan-simplify.mjs --since 30           # widen the posting window
   node scan-simplify.mjs --dry-run            # preview, write nothing
   node scan-simplify.mjs --limit 50           # cap the results written
-  node scan-simplify.mjs --include-inactive   # include listings Simplify marks closed`);
+  node scan-simplify.mjs --include-inactive   # include listings Simplify marks closed
+  node scan-simplify.mjs --json               # machine-readable result on stdout (implies --dry-run)`);
 }
 
 /** Locations arrive as an array; the shared location filter wants a string. */
@@ -134,7 +135,11 @@ async function main() {
   const sinceDays = Number(arg('--since', '7'));
   const cutoffMs = Number.isFinite(sinceDays) && sinceDays > 0 ? Date.now() - sinceDays * 86400_000 : null;
   const limit = Number(arg('--limit', '0')) || Infinity;
-  const dryRun = flag('--dry-run');
+  // --json implies --dry-run: a caller parsing stdout wants the candidates, not
+  // a side effect on the user's pipeline. Making it write as well would mean the
+  // UI's "preview" silently mutated data/pipeline.md.
+  const asJson = flag('--json');
+  const dryRun = flag('--dry-run') || asJson;
   const includeInactive = flag('--include-inactive');
 
   let cfg = {};
@@ -187,8 +192,21 @@ async function main() {
       kept++;
       if (rows.length >= limit) break;
     }
-    console.log(`  ${spec.label}: ${listings.length} listings, ${kept} new match${kept === 1 ? '' : 'es'}`);
+    // stderr in --json mode so stdout stays a single parseable document.
+    (asJson ? console.error : console.log)(`  ${spec.label}: ${listings.length} listings, ${kept} new match${kept === 1 ? '' : 'es'}`);
     if (rows.length >= limit) break;
+  }
+
+  if (asJson) {
+    process.stdout.write(JSON.stringify({
+      scanned, filteredOut: staleOrClosed + filtered, alreadySeen: dupes,
+      offers: rows.map((r) => ({
+        url: r.url, company: r.company, title: r.title,
+        location: r.location, ats: r.portal, postedAt: r.postedAt,
+        sponsorship: r.sponsorship,
+      })),
+    }) + '\n');
+    return;
   }
 
   console.log(`\nScanned ${scanned} listings across ${chosen.length} list(s).`);

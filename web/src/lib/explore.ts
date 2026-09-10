@@ -4,13 +4,30 @@
 // can never drift between the two halves. Server-only logic (spawning the scanner,
 // writing temp files) lives in lib/core/{scan,portals,pipeline}.ts.
 
+/** An ATS directory scanned by scan-ats-full.mjs. */
 export type AtsSource = "greenhouse" | "lever" | "ashby" | "workday";
-export const ATS_SOURCES: AtsSource[] = ["greenhouse", "lever", "ashby", "workday"];
-export const ATS_LABEL: Record<AtsSource, string> = {
+
+/** A SimplifyJobs community list, scanned by scan-simplify.mjs. */
+export type SimplifySource = "simplify-summer2027" | "simplify-newgrad";
+
+/** Everything selectable in the Sources row, whichever scanner backs it. */
+export type DiscoverSource = AtsSource | SimplifySource;
+
+export const SIMPLIFY_SOURCES: SimplifySource[] = ["simplify-summer2027", "simplify-newgrad"];
+export const isSimplifySource = (s: string): s is SimplifySource =>
+  (SIMPLIFY_SOURCES as string[]).includes(s);
+export const ATS_SOURCES: DiscoverSource[] = ["greenhouse", "lever", "ashby", "workday", ...SIMPLIFY_SOURCES];
+export const ATS_LABEL: Record<DiscoverSource, string> = {
   greenhouse: "Greenhouse",
   lever: "Lever",
   ashby: "Ashby",
   workday: "Workday",
+  // Not ATS boards: these are the SimplifyJobs community lists, scanned by
+  // scan-simplify.mjs rather than scan-ats-full.mjs. They sit in the same row
+  // because "where should I look" is one question to the user, even though the
+  // two are fetched differently.
+  "simplify-summer2027": "Simplify · Summer 2027",
+  "simplify-newgrad": "Simplify · New Grad",
 };
 
 /** The full UI filter state. The keyword/location lists mirror scan.mjs's
@@ -24,7 +41,7 @@ export type ExploreFilters = {
   blockHard: string[];
   alwaysAllow: string[];
   sinceDays: number;
-  ats: AtsSource[];
+  ats: DiscoverSource[];
   limitPerAts: number;
 };
 
@@ -106,11 +123,11 @@ function clampNum(v: unknown, lo: number, hi: number, fallback: number): number 
   return Math.min(hi, Math.max(lo, Math.round(n)));
 }
 
-function cleanAts(v: unknown): AtsSource[] {
+function cleanAts(v: unknown): DiscoverSource[] {
   if (!Array.isArray(v)) return [...ATS_SOURCES];
   const out = v
     .map((a) => String(a).toLowerCase())
-    .filter((a): a is AtsSource => (ATS_SOURCES as string[]).includes(a));
+    .filter((a): a is DiscoverSource => (ATS_SOURCES as string[]).includes(a));
   return out.length ? Array.from(new Set(out)) : [...ATS_SOURCES];
 }
 
