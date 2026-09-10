@@ -118,6 +118,37 @@ database, cache, or mirror of user data.
 - [ ] **FR13** The active root + archetype are visible on **every** page, not just a settings
       screen. Acting on the wrong person's data is the failure mode this prevents.
 
+### Functional — Chat router with tabs (Phase 7)
+
+**What already exists — this is an extension, not a build.** `assistant-console.tsx` (692 lines)
+plus `/api/assistant/route.ts` already route typed messages to the user's chosen CLI via
+`spawnHeadlessCli`, parse `<<act:ID {json}>>` envelopes into real actions (navigate, evaluate,
+generatePdf, setStatus, apply, remember, setProfile), render inline worker cards, and gate writes
+behind confirm cards. **Message routing to Claude Code is solved.** What is missing is session
+management and surface.
+
+- [ ] **FR16** **Multiple concurrent conversations as tabs.** Today a single `localStorage` key
+      (`career-ops:chat`) holds one transcript; a new topic destroys the old one. Tabs give each
+      conversation its own transcript, its own in-flight workers, and its own scroll position.
+- [ ] **FR17** ⭐ **Each chat tab binds to a profile (root + archetype).** This is where Phase 7
+      and Phases 2–3 reinforce each other rather than merely coexisting: a tab labeled
+      *Jay · ai_engineer* and a tab labeled *Mom · operations* each act on their own data root.
+      The bound profile is shown in the tab, and **the tab's messages execute against that
+      profile**, so a message typed in one tab can never touch the other's tracker.
+- [ ] **FR18** **Detached / popup surface**, claude.ai-shaped: the console can pop out to a wide
+      reading layout for long conversations, and dock back to the corner for quick actions.
+      State survives the transition — no reload, no lost transcript.
+- [ ] **FR19** **Transcripts persist to disk**, not just `localStorage`:
+      `.career-ops-web/chats/{id}.json` (gitignored, already the runs directory's home). Survives
+      cleared browser data, and is readable by the CLI itself — which matters, because the agent
+      is asked to read `.career-ops-web/runs/{id}.md` today and this is the same pattern.
+- [ ] **FR20** **The confirm-gate is per-tab and non-negotiable.** Every write action
+      (`setProfile`, `setStatus`, `generatePdf`, `apply`) keeps its existing confirm card in every
+      tab. Tabs multiply conversations, never permissions. A background tab may **never** complete
+      a write the user is not looking at.
+- [ ] **FR21** **Model selection is per-tab** and composes with FR8–FR10: a *build the pipeline*
+      tab can run Fable while a *triage 500 hits* tab runs the cheap tier, concurrently.
+
 ### Functional — Claude-in-Chrome experiment slot
 
 - [ ] **FR14** A documented, **disabled-by-default** slot for a Chrome-driven LinkedIn reader,
@@ -173,6 +204,10 @@ database, cache, or mirror of user data.
 | `web/tests/lib/roots.test.mjs` | FR2–FR4, traversal refusal |
 | `web/tests/lib/archetypes.test.mjs` | FR5–FR7, absent-file fallback |
 | `docs/CHROME_LINKEDIN_EXPERIMENT.md` | FR14–FR15 |
+| `web/src/lib/core/chat-sessions.ts` | Tab store + disk persistence (FR16, FR19) |
+| `web/src/app/api/chats/route.ts` | List / create / delete transcripts |
+| `web/src/components/chat-tabs.tsx` | Tab strip + detach control (FR16, FR18) |
+| `web/tests/lib/chat-sessions.test.mjs` | FR16–FR21, incl. per-tab confirm isolation |
 
 ### Files to modify
 
@@ -183,6 +218,8 @@ database, cache, or mirror of user data.
 | `web/src/components/app-shell.tsx` | Mount the switcher (FR13) |
 | `web/src/lib/apply/cv-selection.mjs` | Archetype-aware `.tex` selection (FR6) |
 | `web/package.json` | reactbits deps (FR11) |
+| `web/src/components/assistant-console.tsx` | Single-transcript → tab-scoped store (FR16–FR21) |
+| `web/src/app/api/assistant/route.ts` | Accept tab id + per-tab profile/model (FR17, FR21) |
 
 ### Architecture
 
@@ -222,6 +259,11 @@ not visually bare today.
 | Two browser tabs, different roots | Server-side state is global per server — last write wins. **Documented, not solved** (see OQ4) |
 | Model string names a nonexistent model | The CLI's own error surfaces verbatim; web does not validate model names (FR9) |
 | `prefers-reduced-motion` set | Animations become instant state changes (FR12) |
+| Chat tab open when its bound root is removed from `roots.yml` | Tab goes read-only with a banner; transcript preserved; no further sends |
+| Two tabs run workers at once | Allowed and expected — each worker carries its own tab's profile; results never cross |
+| A write action confirmed in a background tab | Confirm cards are per-tab and require that tab focused; a background tab cannot silently write (FR20) |
+| `.career-ops-web/chats/` unwritable | Fall back to `localStorage`, warn once, never lose the live transcript |
+| Existing single `career-ops:chat` transcript on upgrade | Migrated into tab 1 on first load; never discarded |
 
 ---
 
@@ -236,6 +278,10 @@ not visually bare today.
 - [ ] **AC7** Test suite ≤ 2 failures, and both are the known baseline pair.
 - [ ] **AC8** Active root + archetype visible on every page.
 - [ ] **AC9** Chrome/LinkedIn slot is documented and inert — no scraping code ships enabled.
+- [ ] **AC10** Two chat tabs bound to different roots run workers concurrently; each writes only to its own root's tracker, verified by assertion, not by eye.
+- [ ] **AC11** A write action in an unfocused tab does not complete without that tab's confirm (FR20).
+- [ ] **AC12** An existing `career-ops:chat` transcript survives upgrade as tab 1.
+- [ ] **AC13** Popping the console out and docking it back loses neither transcript nor in-flight worker state.
 
 ---
 
@@ -248,6 +294,8 @@ not visually bare today.
 - Auth / multi-user serving — this is a local-first, single-operator app
 - Applying the pending **1.32.0** core update (see below)
 - A working LinkedIn scraper (FR15)
+- Rebuilding the chat **routing** — it already works; Phase 7 adds sessions and surface only
+- Cloud-synced or cross-device chat history (local-first, by design)
 
 ---
 
@@ -289,6 +337,7 @@ Costs roughly a day over the naive version. Worth it.
 | **4** | FR8–FR10 model routing | ✅ Yes |
 | **5** | FR11–FR13 UI components | ✅ Yes |
 | **6** | FR14–FR15 Chrome slot (docs) | ✅ Yes |
+| **7** | FR16–FR21 chat tabs + detached surface + per-tab profile/model | ✅ Yes — but lands *after* Phases 2–3, since FR17 binds tabs to profiles |
 
 Phase 1 is worth doing regardless of whether the rest is approved.
 
