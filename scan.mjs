@@ -3550,6 +3550,18 @@ async function main() {
       duplicates: totalDupes,
       added: verifiedOffers.length,
       added_urls: verifiedOffers.map(offer => offer.url),
+      // Full offer records alongside the bare URLs. added_urls stays for every
+      // existing consumer; this is additive. A caller that wants to SHOW the
+      // results (the web Explorer) needs the company, title and location, and
+      // the alternative was re-parsing the human-readable dry-run output, which
+      // is formatting rather than a contract.
+      added_offers: verifiedOffers.map(offer => ({
+        url: offer.url,
+        company: offer.company ?? '',
+        title: offer.title ?? '',
+        location: offer.location ?? '',
+        postedAt: offer.postedAt ?? offer.posted_at ?? '',
+      })),
       errors: errors.map(({ company, error }) => ({ company, error })),
       dry_run: dryRun,
     }, errors.length > 0 ? 2 : 0);
