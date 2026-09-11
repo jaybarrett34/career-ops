@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Upload, Download, Trash2, FileText, Loader2 } from "lucide-react";
+import { Upload, Download, Trash2, FileText, Loader2, Table2 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { formatBytes } from "@/lib/core/files.mjs";
 
@@ -95,6 +95,29 @@ export function FilesView() {
       {error && (
         <p className="rounded-md border border-red-500/40 bg-red-500/5 px-3 py-2 text-sm text-red-500">{error}</p>
       )}
+
+      <section className="flex flex-col gap-2">
+        <div className="flex items-baseline gap-3">
+          <h2 className="text-sm font-semibold tracking-tight">Export</h2>
+          <span className="text-xs text-faint">Your data, in a format nothing here controls.</span>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {[
+            { kind: "tracker", label: "Tracker (CSV)" },
+            { kind: "pipeline", label: "Pipeline (CSV)" },
+            { kind: "all", label: "Everything (JSON)" },
+          ].map((x) => (
+            <a
+              key={x.kind}
+              href={`/api/export?kind=${x.kind}`}
+              className="inline-flex items-center gap-2 rounded-md border border-border bg-surface/50 px-3 py-2 text-sm transition-colors hover:bg-surface-hover"
+            >
+              <Table2 className="size-3.5 text-muted" />
+              {x.label}
+            </a>
+          ))}
+        </div>
+      </section>
 
       <Group title="Documents" hint="Read by intake. Yours to add and remove." rows={docs} onDelete={remove} busy={busy} />
       <Group title="Output" hint="Generated CVs and PDFs. Download only." rows={out} busy={busy} />
