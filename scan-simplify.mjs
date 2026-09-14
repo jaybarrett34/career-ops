@@ -152,7 +152,11 @@ function promote() {
     console.error(`No ledger at ${DISCOVERED_PATH}. Run a scan first.`);
     process.exit(1);
   }
-  const picked = [...map.values()].filter((r) => r.promoted);
+  // A dismissed entry is a decision not to track the company; promoting one
+  // would be the flag quietly overriding the lock.
+  const picked = [...map.values()].filter((r) => r.promoted && r.lock !== 'dismissed');
+  const refused = [...map.values()].filter((r) => r.promoted && r.lock === 'dismissed');
+  for (const r of refused) console.log(`Skipping ${r.company}: marked promoted but also dismissed.`);
   if (!picked.length) return console.log('Nothing marked promoted: true.');
 
   const src = fs.readFileSync(PORTALS_PATH, 'utf8');

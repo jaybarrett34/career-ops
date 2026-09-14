@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { hostOf, companyKey, isSharedHost, normalizeDiscovered, mergeDiscoveries, toYaml, promotionCandidates } from '../lib/discovered.mjs';
+import * as yaml from 'js-yaml';
+import { hostOf, companyKey, isSharedHost, normalizeDiscovered, mergeDiscoveries, setLock, toYaml, promotionCandidates } from '../lib/discovered.mjs';
+
+const yamlLoad = (t) => yaml.load(t);
 
 test('hosts normalize, www is dropped, junk yields empty', () => {
   assert.equal(hostOf('https://www.Optiver.com/jobs/1'), 'optiver.com');
@@ -106,4 +109,45 @@ test('workday and icims tenants are treated as shared', () => {
 test('garbage input normalizes to an empty map rather than throwing', () => {
   for (const j of [null, undefined, 42, 'str', { discovered: 'no' }])
     assert.equal(normalizeDiscovered(j).size, 0);
+});
+
+test('a lock survives a later scan', () => {
+  const day1 = mergeDiscoveries(new Map(), [{ company: 'Acme', url: 'https://acme.com/1' }], { today: 'd1' });
+  const { map: locked } = setLock(day1.merged, 'acme', 'dismissed');
+  const day2 = mergeDiscoveries(locked, [{ company: 'Acme', url: 'https://acme.com/2' }], { today: 'd2' });
+  const e = day2.merged.get('acme');
+  assert.equal(e.lock, 'dismissed');
+  // Counting continues, so the entry stays in the file and the decision holds.
+  assert.equal(e.count, 2);
+});
+
+test('dismissed is never offered for promotion, pinned always is', () => {
+  let m = mergeDiscoveries(new Map(), [
+    { company: 'Seen Twice', url: 'https://a.com/1' },
+    { company: 'Seen Twice', url: 'https://a.com/2' },
+    { company: 'Seen Once', url: 'https://b.com/1' },
+  ], { today: 'd' }).merged;
+  assert.deepEqual(promotionCandidates(m).map((r) => r.company), ['Seen Twice']);
+  m = setLock(m, 'seentwice', 'dismissed').map;
+  m = setLock(m, 'seenonce', 'pinned').map;
+  assert.deepEqual(promotionCandidates(m).map((r) => r.company), ['Seen Once']);
+});
+
+test('a lock round-trips through YAML', () => {
+  const m = setLock(mergeDiscoveries(new Map(), [{ company: 'Acme', url: 'https://acme.com/1' }], { today: 'd' }).merged,
+    'acme', 'pinned').map;
+  const text = toYaml(m);
+  assert.match(text, /lock: pinned/);
+  assert.equal(normalizeDiscovered(yamlLoad(text)).get('acme').lock, 'pinned');
+});
+
+test('an unknown lock in the file degrades to open rather than throwing', () => {
+  const m = normalizeDiscovered({ discovered: [{ company: 'Acme', lock: 'banished', count: 3 }] });
+  assert.equal(m.get('acme').lock, 'open');
+});
+
+test('setLock refuses an unknown lock and reports a miss', () => {
+  const m = mergeDiscoveries(new Map(), [{ company: 'Acme', url: 'https://acme.com/1' }], { today: 'd' }).merged;
+  assert.throws(() => setLock(m, 'acme', 'banished'), /unknown lock/);
+  assert.equal(setLock(m, 'nobody', 'pinned').found, false);
 });
