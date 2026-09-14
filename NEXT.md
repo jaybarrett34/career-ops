@@ -19,11 +19,7 @@ the tree is clean and the suite is green except one environmental failure (see b
 
 ## Left to do, roughly in order
 
-1. **Web surface for `discovered`.** The ledger is the backend half. The ask was
-   "emit them as new component boxes and retain them in general for future ... lock these
-   more explicitly per profile." Nothing renders it yet. Needs a route reading
-   `config/discovered.yml` under the active root, boxes per company with the count and hosts,
-   and a per-profile lock so a promotion on one profile does not leak to another.
+1. **Two decisions waiting on you** (see "Open questions" below).
 
 2. **Web UI for the bullet library.** Pick a listing from the pipeline, rank bullets against
    its keywords (`scoreAgainstKeywords` already exists), toggle them, compile. `compose-resume.mjs`
@@ -45,6 +41,23 @@ the tree is clean and the suite is green except one environmental failure (see b
 
 5. **Yours, not mine:** the Simplify Outlier text and headline still need fixing, and
    PRs #4064/#4065 are waiting on upstream maintainers.
+
+## Open questions for Jay
+
+1. **The word "process".** `QUARANTINE.md` marks it UNRESOLVED and says to strip it on the
+   next rebuild unless cleared. "Modernized a legacy semiconductor data export onto a
+   **process-based** JSON schema" is live on six archetypes (ai_engineer, data_engineer,
+   research_ga, solutions_architect, swe, tech_consultant) through one shared bullet. One
+   edit to `intel-corporation-modernized-legacy-semiconducto-6` fixes all six. Clear the word
+   or name the replacement.
+
+2. **The multi-sponsor scope bullet.** Added to the library as
+   `intel-pm-sequenced-sponsor-projects` but deliberately NOT slotted into any resume:
+   "Carried concurrent automation projects for four sponsoring teams inside one engineering
+   org, sequencing delivery against a sponsor-maintained roadmap." You called the
+   12-projects/6-areas frame "incredibly gray area between job function and career wins" for
+   the tech archetypes. On a PM resume multi-stakeholder sequencing IS the job, which is why
+   it is written and waiting rather than dropped. Say the word and it goes in.
 
 ## Known failure, not ours
 
