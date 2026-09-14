@@ -243,6 +243,8 @@ const SYSTEM_PATHS = [
   'scan-hn.mjs',
   'scan-simplify.mjs',
   'lib/bullets.mjs',
+  'lib/xlsx.mjs',
+  'tests/xlsx.test.mjs',
   'lib/tex-sections.mjs',
   'compose-resume.mjs',
   'tests/tex-sections.test.mjs',
