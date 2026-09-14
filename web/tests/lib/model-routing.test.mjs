@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { claudeCliArgs, argValue } from "../../src/lib/claude-invocation.mjs";
+import { isNestedCheckout } from "../../../lib/mjs-files.mjs";
 
 const KINDS = ["pdf", "evaluate", "research"];
 
@@ -55,7 +56,7 @@ test("NO model name is hardcoded anywhere in web/src (modes/_shared.md owns that
   const walk = (d) => {
     for (const e of fs.readdirSync(d, { withFileTypes: true })) {
       const p = path.join(d, e.name);
-      if (e.isDirectory()) walk(p);
+      if (e.isDirectory()) { if (!isNestedCheckout(p)) walk(p); }
       else if (/\.(ts|tsx|mjs)$/.test(p)) {
         const m = fs.readFileSync(p, "utf8").match(NAMES);
         if (m) offenders.push(`${path.relative(SRC, p)}: ${m[0]}`);

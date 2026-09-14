@@ -111,6 +111,26 @@ private repository**, which this checkout points at via `.career-ops-data` or
 Each data repo has full independent git history and never touches this remote. See
 [`config/roots.example.yml`](config/roots.example.yml).
 
+### Fork-local config files
+
+All gitignored per file, all resolved against the **active data root**, so each profile keeps
+its own:
+
+| File | Written by | Holds |
+|---|---|---|
+| `config/roots.yml` | hand-edited only | the profile registry (label -> absolute path) |
+| `config/archetypes.yml` | hand-edited only | archetype names per root |
+| `config/bullets.yml` | `extract-bullets.mjs` | the bullet library |
+| `config/resumes.yml` | hand-edited, read by `compose-resume.mjs` | which bullets each archetype renders |
+| `config/discovered.yml` | `scan-simplify.mjs` | companies a trawl surfaced that `portals.yml` does not track |
+
+`config/discovered.yml` is the dynamic-expansion ledger: every scan folds its companies in with a
+running count, the hosts they appeared on, and which scanner found them, so a root that started
+with no `portals.yml` accumulates one from its own results. Set `promoted: true` on an entry and
+`node scan-simplify.mjs --promote` appends it to `tracked_companies`. The `careers_url` it writes
+is the company's own host, which is a starting point and not a verified board -- `audit-portals.mjs`
+is what tells you whether a provider actually claims it.
+
 `config/roots.yml` is gitignored specifically because it maps real people to absolute paths and
 its labels are usually real names. The registry is also **hand-edited on purpose**: the app never
 writes a path into it, which is what prevents a request from naming a directory outside the

@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { isNestedCheckout } from "../../../lib/mjs-files.mjs";
 
 /**
  * Every entry point that can reach careerOpsRoot() must establish a profile
@@ -45,7 +46,7 @@ function resolveSpec(spec, from) {
 function walk(dir, out = []) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
     const p = path.join(dir, e.name);
-    if (e.isDirectory()) walk(p, out);
+    if (e.isDirectory()) { if (!isNestedCheckout(p)) walk(p, out); }
     else if (EXT.includes(path.extname(p))) out.push(p);
   }
   return out;

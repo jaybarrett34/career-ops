@@ -3540,6 +3540,10 @@ async function main() {
       + totalFilteredPostingAge + totalFilteredPostedDate + totalFilteredSalary
       + totalFilteredContent + totalFilteredCountryEligibility + totalFilteredBlacklist
       + totalFilteredVisa + totalFilteredCooldown;
+    // @1 is an OPEN schema: a field may be added without a version bump, but no
+    // existing field may be removed, renamed, or change meaning. A consumer must
+    // read the fields it needs and ignore the rest. Removing one is what @2 is
+    // for. The strict shape assertion lives in tests/scan-json-receipt.test.mjs.
     emitJsonReceipt({
       version: 'careerops.scan.receipt@1',
       date,
