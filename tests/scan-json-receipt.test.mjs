@@ -102,6 +102,10 @@ test('only unsupported directory fsync errors are ignored on Windows', () => {
   assert.equal(isIgnorableDirectoryFsyncError({ code: 'ENOSPC' }, 'win32'), false);
 });
 
+// The receipt is an OPEN schema (see scan.mjs): fields may be ADDED at @1. This
+// assertion is still strict-equal on purpose -- it is what catches a field being
+// removed, renamed, or quietly changing meaning, which is the breaking direction.
+// Adding a field here alongside the emitter is the intended maintenance step.
 test('--json emits exactly one clean successful receipt', () => {
   const root = workspace('tracked_companies: []\njob_boards: []\n');
   try {
@@ -119,6 +123,7 @@ test('--json emits exactly one clean successful receipt', () => {
       duplicates: 0,
       added: 0,
       added_urls: [],
+      added_offers: [],
       errors: [],
       dry_run: true,
     });

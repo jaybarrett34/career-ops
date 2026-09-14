@@ -40,8 +40,9 @@ import {
 import { normalizeCompany } from './tracker-utils.mjs';
 import { getCareerOpsRoot } from './path-resolver.mjs';
 import {
-  companyKey, normalizeDiscovered, mergeDiscoveries, toYaml, promotionCandidates,
+  companyKey, isSharedHost, normalizeDiscovered, mergeDiscoveries, toYaml, promotionCandidates,
 } from './lib/discovered.mjs';
+import { isMainModule } from './lib/is-main-module.mjs';
 
 export const DISCOVERED_PATH = path.join(getCareerOpsRoot(), 'config/discovered.yml');
 
@@ -85,6 +86,7 @@ function usage() {
   node scan-simplify.mjs --include-inactive   # include listings Simplify marks closed
   node scan-simplify.mjs --include-blacklisted # let data/blacklist.md matches through
   node scan-simplify.mjs --no-discover        # skip the config/discovered.yml ledger
+  node scan-simplify.mjs --promote            # append discovered entries marked promoted: true to portals.yml
   node scan-simplify.mjs --json               # machine-readable result on stdout (implies --dry-run)`);
 }
 
@@ -132,8 +134,57 @@ async function fetchList(spec) {
   return data;
 }
 
+/**
+ * Move every `promoted: true` entry in config/discovered.yml into portals.yml
+ * tracked_companies.
+ *
+ * The ledger's header tells the reader to set that flag, so something has to
+ * honor it; a flag the user sets and nothing reads is worse than no flag. The
+ * host recorded on the entry becomes careers_url, which is a starting point and
+ * not a verified board -- run audit-portals.mjs afterwards, since a company's
+ * own domain is frequently a marketing page with no provider behind it.
+ */
+function promote() {
+  let map;
+  try {
+    map = normalizeDiscovered(yaml.load(fs.readFileSync(DISCOVERED_PATH, 'utf8')));
+  } catch {
+    console.error(`No ledger at ${DISCOVERED_PATH}. Run a scan first.`);
+    process.exit(1);
+  }
+  const picked = [...map.values()].filter((r) => r.promoted);
+  if (!picked.length) return console.log('Nothing marked promoted: true.');
+
+  const src = fs.readFileSync(PORTALS_PATH, 'utf8');
+  const cfg = yaml.load(src) || {};
+  const already = new Set((cfg.tracked_companies || [])
+    .map((c) => companyKey(typeof c === 'string' ? c : c?.name)).filter(Boolean));
+
+  const lines = [];
+  for (const r of picked) {
+    if (already.has(companyKey(r.company))) continue;
+    // A shared ATS host is the vendor's domain, not the company's, so it is not
+    // a careers_url worth writing.
+    const host = r.hosts.find((h) => !isSharedHost(h));
+    lines.push(`  - name: ${r.company}`);
+    lines.push(`    careers_url: https://${host || 'EDIT-ME'}/`);
+    lines.push(`    # promoted from config/discovered.yml, seen ${r.count}x${host ? '' : ' -- no own domain recorded, fill in'}`);
+  }
+  if (!lines.length) return console.log('Every promoted entry is already in tracked_companies.');
+
+  // Appended at the end of the file rather than spliced into the block: the
+  // block carries hand-written grouping comments that a reserializing YAML
+  // round-trip would destroy.
+  atomicWriteFile(PORTALS_PATH, `${src.replace(/\s*$/, '')}\n\n  # ── Promoted from a scan ──\n${lines.join('\n')}\n`);
+  // Promoted entries stay in the ledger with their history; the name check above
+  // is what keeps a second --promote from duplicating them.
+  console.log(`Appended ${lines.length / 3} compan${lines.length === 3 ? 'y' : 'ies'} to portals.yml tracked_companies.`);
+  console.log('Run `node audit-portals.mjs` to check each careers_url resolves to a real board.');
+}
+
 async function main() {
   if (flag('--help') || flag('-h')) return usage();
+  if (flag('--promote')) return promote();
 
   const which = arg('--list');
   if (which && !LISTS[which]) {
@@ -316,6 +367,6 @@ function reportDiscoveries(candidates) {
   console.log('Set promoted: true in config/discovered.yml to move one into portals.yml.');
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMainModule(import.meta.url)) {
   main().catch((e) => { console.error(e.message); process.exit(1); });
 }

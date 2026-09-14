@@ -8,6 +8,7 @@ import zlib from 'node:zlib';
 import { validateLibrary, selectBullets, scoreAgainstKeywords } from './lib/bullets.mjs';
 import { headings, headingAt } from './lib/tex-sections.mjs';
 import { getCareerOpsRoot } from './path-resolver.mjs';
+import { isMainModule } from './lib/is-main-module.mjs';
 
 const ROOT = getCareerOpsRoot();
 const arg = (n, d = null) => { const i = process.argv.indexOf(n); return i >= 0 && process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[i + 1] : d; };
@@ -130,4 +131,4 @@ function main() {
   process.exit(2);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) main();
+if (isMainModule(import.meta.url)) main();

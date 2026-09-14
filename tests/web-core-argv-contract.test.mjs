@@ -79,6 +79,14 @@ const CALL_SITES = [
     probe: 'flags-only',
   },
   {
+    // The same source spawns a second script: the ATS sweep and the Simplify
+    // lists are two different scanners behind one Explorer control.
+    source: 'web/src/lib/core/scan.ts',
+    script: 'scan-simplify.mjs',
+    args: ['--json', '--list', 'summer2027', '--since', '7', '--limit', '150'],
+    probe: 'flags-only',
+  },
+  {
     source: 'web/src/lib/core/pipeline.ts',
     script: null,
     args: [],
@@ -156,12 +164,21 @@ try {
   // Every `"--flag"` literal in a listed source must appear in its argv here.
   // This covers the argv literals the routes write inline; it does NOT cover a
   // flag assembled at runtime from a variable or a template string.
-  const flagDrift = [];
+  // Coverage is per SOURCE, not per entry: one source may spawn more than one
+  // script (the Explorer runs both the ATS sweep and the Simplify lists), and
+  // each script only accepts its own flags. Requiring every entry to carry
+  // every flag in the file would demand that each probe pass the other's.
+  const argsBySource = new Map();
   for (const site of CALL_SITES) {
-    const src = readFileSync(join(ROOT, site.source), 'utf-8');
+    if (!argsBySource.has(site.source)) argsBySource.set(site.source, new Set());
+    for (const a of site.args) argsBySource.get(site.source).add(a);
+  }
+  const flagDrift = [];
+  for (const [source, covered] of argsBySource) {
+    const src = readFileSync(join(ROOT, source), 'utf-8');
     const literals = [...new Set([...src.matchAll(/"(--[a-z][a-z0-9-]*)"/g)].map((m) => m[1]))];
     for (const flag of literals) {
-      if (!site.args.includes(flag)) flagDrift.push(`${site.source} passes ${flag}, which no probe above covers`);
+      if (!covered.has(flag)) flagDrift.push(`${source} passes ${flag}, which no probe above covers`);
     }
   }
   if (flagDrift.length === 0) pass('every --flag literal in the listed web sources is covered by a probe');
