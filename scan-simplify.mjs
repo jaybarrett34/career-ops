@@ -33,10 +33,17 @@ import path from 'node:path';
 import * as yaml from 'js-yaml';
 import {
   buildTitleFilter, buildLocationFilter, buildContentFilter,
-  loadSeenUrls, atomicWriteFile,
+  loadSeenUrls, atomicWriteFile, loadBlacklist,
   sanitizeMarkdownField, sanitizeTsvField,
   SCAN_HISTORY_PATH, PIPELINE_PATH, PORTALS_PATH,
 } from './scan.mjs';
+import { normalizeCompany } from './tracker-utils.mjs';
+import { getCareerOpsRoot } from './path-resolver.mjs';
+import {
+  companyKey, normalizeDiscovered, mergeDiscoveries, toYaml, promotionCandidates,
+} from './lib/discovered.mjs';
+
+export const DISCOVERED_PATH = path.join(getCareerOpsRoot(), 'config/discovered.yml');
 
 /** The lists, and the term each one is scanned for. */
 export const LISTS = {
@@ -76,6 +83,8 @@ function usage() {
   node scan-simplify.mjs --dry-run            # preview, write nothing
   node scan-simplify.mjs --limit 50           # cap the results written
   node scan-simplify.mjs --include-inactive   # include listings Simplify marks closed
+  node scan-simplify.mjs --include-blacklisted # let data/blacklist.md matches through
+  node scan-simplify.mjs --no-discover        # skip the config/discovered.yml ledger
   node scan-simplify.mjs --json               # machine-readable result on stdout (implies --dry-run)`);
 }
 
@@ -141,6 +150,8 @@ async function main() {
   const asJson = flag('--json');
   const dryRun = flag('--dry-run') || asJson;
   const includeInactive = flag('--include-inactive');
+  const includeBlacklisted = flag('--include-blacklisted');
+  const discover = !flag('--no-discover');
 
   let cfg = {};
   try {
@@ -151,7 +162,19 @@ async function main() {
   const titleFilter = cfg.title_filter ? buildTitleFilter(cfg.title_filter) : null;
   const locationFilter = cfg.location_filter ? buildLocationFilter(cfg.location_filter) : null;
   const contentFilter = cfg.content_filter ? buildContentFilter(cfg.content_filter) : null;
-  const blacklist = new Set((cfg.blacklist_companies || []).map((c) => String(c).toLowerCase().trim()));
+  // Two sources, one gate. portals.yml blacklist_companies is this scanner's
+  // original list; data/blacklist.md is the do-not-apply file scan.mjs honors,
+  // and a company the user refuses has not become acceptable by arriving through
+  // a different scanner.
+  const blacklist = loadBlacklist();
+  for (const c of cfg.blacklist_companies || []) {
+    const k = normalizeCompany(String(c));
+    if (k && !blacklist.has(k)) blacklist.set(k, { company: String(c), reason: 'portals.yml' });
+  }
+  // Companies portals.yml already tracks are not discoveries.
+  const tracked = new Set((cfg.tracked_companies || [])
+    .map((c) => companyKey(typeof c === 'string' ? c : c?.name))
+    .filter(Boolean));
 
   // loadSeenUrls() returns { seen, recheckEligible }, not a bare Set.
   const { seen } = loadSeenUrls();
@@ -175,7 +198,8 @@ async function main() {
         continue;
       }
       const company = typeof l.company_name === 'string' ? l.company_name : '';
-      if (blacklist.has(company.toLowerCase().trim())) { filtered++; continue; }
+      const blEntry = blacklist.get(normalizeCompany(company));
+      if (blEntry && !includeBlacklisted) { filtered++; continue; }
       if (contentFilter && !contentFilter(`${l.title} ${company}`)) { filtered++; continue; }
       if (seen.has(l.url)) { dupes++; continue; }
       seen.add(l.url);
@@ -188,6 +212,7 @@ async function main() {
         postedAt: Number.isFinite(Number(l.date_posted)) && Number(l.date_posted) > 0
           ? new Date(Number(l.date_posted) * 1000).toISOString().slice(0, 10) : '',
         sponsorship: typeof l.sponsorship === 'string' ? l.sponsorship : '',
+        blacklisted: blEntry ? (blEntry.reason || 'on your do-not-apply list') : '',
       });
       kept++;
       if (rows.length >= limit) break;
@@ -203,8 +228,11 @@ async function main() {
       offers: rows.map((r) => ({
         url: r.url, company: r.company, title: r.title,
         location: r.location, ats: r.portal, postedAt: r.postedAt,
-        sponsorship: r.sponsorship,
+        sponsorship: r.sponsorship, blacklisted: r.blacklisted || undefined,
       })),
+      discovered: discover ? recordDiscoveries(rows, tracked, { dryRun: true }).map((d) => ({
+        company: d.company, count: d.count, hosts: d.hosts,
+      })) : [],
     }) + '\n');
     return;
   }
@@ -216,8 +244,9 @@ async function main() {
 
   if (!rows.length) return;
   if (dryRun) {
+    if (discover) reportDiscoveries(recordDiscoveries(rows, tracked, { dryRun: true }));
     for (const r of rows.slice(0, 40)) {
-      console.log(`  + [${r.portal}] ${r.postedAt || '?'} | ${r.company} | ${r.title} | ${r.location}`);
+      console.log(`  + [${r.portal}] ${r.postedAt || '?'} | ${r.company} | ${r.title} | ${r.location}${r.blacklisted ? ` [BLACKLISTED: ${r.blacklisted}]` : ''}`);
       console.log(`    ${r.url}`);
     }
     if (rows.length > 40) console.log(`  ... and ${rows.length - 40} more`);
@@ -249,6 +278,42 @@ async function main() {
   atomicWriteFile(SCAN_HISTORY_PATH, `${priorHist}\n${histLines.join('\n')}\n`);
 
   console.log(`\nWrote ${rows.length} to data/pipeline.md and data/scan-history.tsv.`);
+  if (discover) reportDiscoveries(recordDiscoveries(rows, tracked, { dryRun: false }));
+}
+
+/**
+ * Fold this run's companies into config/discovered.yml and return the entries
+ * now worth promoting.
+ *
+ * The ledger is per data root, so each profile accumulates its own map of where
+ * its roles come from. That map is the only thing a root with no portals.yml
+ * has to build one from.
+ */
+function recordDiscoveries(rows, tracked, { dryRun }) {
+  let existing = new Map();
+  try {
+    existing = normalizeDiscovered(yaml.load(fs.readFileSync(DISCOVERED_PATH, 'utf8')));
+  } catch { /* absent or unreadable: start from nothing */ }
+  const { merged } = mergeDiscoveries(existing, rows, {
+    known: tracked,
+    today: new Date().toISOString().slice(0, 10),
+    source: 'simplify',
+  });
+  if (!dryRun) {
+    fs.mkdirSync(path.dirname(DISCOVERED_PATH), { recursive: true });
+    atomicWriteFile(DISCOVERED_PATH, toYaml(merged));
+  }
+  return promotionCandidates(merged);
+}
+
+function reportDiscoveries(candidates) {
+  if (!candidates.length) return;
+  console.log(`\n${candidates.length} untracked compan${candidates.length === 1 ? 'y has' : 'ies have'} come up more than once:`);
+  for (const c of candidates.slice(0, 15)) {
+    console.log(`  ${String(c.count).padStart(3)}x  ${c.company}${c.hosts.length ? `  (${c.hosts[0]})` : ''}`);
+  }
+  if (candidates.length > 15) console.log(`  ... and ${candidates.length - 15} more`);
+  console.log('Set promoted: true in config/discovered.yml to move one into portals.yml.');
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
