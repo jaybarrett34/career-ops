@@ -16,21 +16,35 @@ the tree is clean and the suite is green except one environmental failure (see b
   `--include-blacklisted` let them through annotated.
 - Suite fixes: main-module guards, nested-checkout walker guards, the scan receipt contract,
   four redundant `SYSTEM_PATHS` entries, per-source flag coverage in the argv contract.
+- `profile-bundle.mjs` — export a data root as a standalone directory to git init and push,
+  import a cloned one and register it. Round-tripped a real 91-file profile byte-for-byte.
+- Ran the pipeline end to end on the real root: scan -> JD fetch -> two reports -> tracker ->
+  tailored CV. Findings are item 2 below and the `word:Lead` entry now in portals.yml.
 
 ## Left to do, roughly in order
 
 1. **Two decisions waiting on you** (see "Open questions" below).
 
-2. **Web UI for the bullet library.** Pick a listing from the pipeline, rank bullets against
+2. **A graduation-window gate.** The highest-value filter left, and the finding
+   from actually running the pipeline. Most Summer 2027 JDs state a required
+   graduation window, it is a hard yes/no rather than a score, and nothing checks
+   it. On one day's Chicago listings: Northern Trust wants Dec 2027 - Summer 2028
+   (MS fits), Motorola wants "on or after December 2027" (fits), CIBC wants Dec
+   2026 - Jun 2027 (BA six months early, MS six months late - a genuine SKIP that
+   looked like a target until the JD was read). The window does not correlate
+   with company, location or title. Needs a `graduation_window` block in
+   portals.yml and a JD-text check, since it cannot be known from a listing row.
+
+3. **Web UI for the bullet library.** Pick a listing from the pipeline, rank bullets against
    its keywords (`scoreAgainstKeywords` already exists), toggle them, compile. `compose-resume.mjs`
    already owns the `.tex` write, so the UI drives it rather than editing files.
 
-3. **Marilyn's root has no `portals.yml`.** Scans under her profile have nothing to filter
+4. **Marilyn's root has no `portals.yml`.** Scans under her profile have nothing to filter
    with. The discovered ledger is meant to be how that root builds one, so this is partly
    unblocked by item 1 — but she still needs a starting `title_filter`/`location_filter`
    for revenue cycle / admin / training roles.
 
-4. **Bullet audit items still open** (from the pass over all bullets):
+5. **Bullet audit items still open** (from the pass over all bullets):
    - Kyndryl's long Kafka bullet is still function-only on most archetypes. Master supplies
      the Z: Docker enforcing parity, eliminating config drift.
    - The energy-sector bullet is still on `solutions_architect` though master calls it the
@@ -39,7 +53,7 @@ the tree is clean and the suite is green except one environmental failure (see b
    - The ROTC snack bar is still on tech archetypes.
    - Cornell tutor bullets have scale but no outcome clause.
 
-5. **Yours, not mine:** the Simplify Outlier text and headline still need fixing, and
+6. **Yours, not mine:** the Simplify Outlier text and headline still need fixing, and
    PRs #4064/#4065 are waiting on upstream maintainers.
 
 ## Open questions for Jay
