@@ -247,6 +247,7 @@ const SYSTEM_PATHS = [
   'lib/xlsx.mjs',
   'lib/tex-sections.mjs',
   'compose-resume.mjs',
+  'profile-bundle.mjs',
   'scripts/seed-bullets.mjs',
   'scripts/check-syntax.mjs',
   'scripts/export-ats-text.mjs',
