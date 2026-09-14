@@ -2,6 +2,7 @@ import { readApplications, readInbox } from "@/lib/career-ops";
 import { withActiveProfile } from "@/lib/core/with-profile";
 import { activeProfile } from "@/lib/core/active-profile-types";
 import { toCsv, exportFilename, TRACKER_COLUMNS, PIPELINE_COLUMNS } from "@/lib/core/export.mjs";
+import { buildXlsx } from "@/lib/core/xlsx.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,11 +16,28 @@ type Kind = (typeof KINDS)[number];
 async function handleGET(req: Request) {
   const url = new URL(req.url);
   const kind = (url.searchParams.get("kind") || "tracker") as Kind;
-  const format = url.searchParams.get("format") === "json" ? "json" : "csv";
+  const fmt = url.searchParams.get("format");
+  const format = fmt === "json" ? "json" : fmt === "xlsx" ? "xlsx" : "csv";
   if (!KINDS.includes(kind)) return Response.json({ error: `unknown kind: ${kind}` }, { status: 400 });
 
   const today = new Date().toISOString().slice(0, 10);
   const prof = activeProfile();
+
+  if (format === "xlsx") {
+    const rows = (cols: readonly { key: string; label: string }[], data: Record<string, unknown>[]) =>
+      [cols.map((c) => c.label), ...data.map((d) => cols.map((c) => (d[c.key] ?? "") as string))];
+    const buf = buildXlsx([
+      { name: "Tracker", rows: rows(TRACKER_COLUMNS, readApplications() as unknown as Record<string, unknown>[]) },
+      { name: "Pipeline", rows: rows(PIPELINE_COLUMNS, readInbox() as unknown as Record<string, unknown>[]) },
+    ]);
+    return new Response(new Uint8Array(buf), {
+      headers: {
+        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition": `attachment; filename="${exportFilename(kind, "xlsx", today)}"`,
+        "X-Content-Type-Options": "nosniff",
+      },
+    });
+  }
 
   let body: string;
   let ext: string;

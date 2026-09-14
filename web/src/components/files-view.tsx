@@ -106,10 +106,11 @@ export function FilesView() {
             { kind: "tracker", label: "Tracker (CSV)" },
             { kind: "pipeline", label: "Pipeline (CSV)" },
             { kind: "all", label: "Everything (JSON)" },
+            { kind: "workbook", label: "Workbook (XLSX)", format: "xlsx" },
           ].map((x) => (
             <a
               key={x.kind}
-              href={`/api/export?kind=${x.kind}`}
+              href={`/api/export?kind=${x.kind === "workbook" ? "all" : x.kind}${"format" in x ? `&format=${(x as { format: string }).format}` : ""}`}
               className="inline-flex items-center gap-2 rounded-md border border-border bg-surface/50 px-3 py-2 text-sm transition-colors hover:bg-surface-hover"
             >
               <Table2 className="size-3.5 text-muted" />
