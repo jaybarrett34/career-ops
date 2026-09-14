@@ -71,6 +71,7 @@ config/roots.yml
 config/archetypes.yml
 config/bullets.yml
 config/resumes.yml
+config/discovered.yml
 # Fork-local path declarations — this checkout's own files, read by
 # update-system.mjs. Gitignored on purpose: it describes THIS clone, not the
 # project, and must survive the sync that overwrites update-system.mjs (#2421).
