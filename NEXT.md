@@ -19,13 +19,18 @@ the tree is clean and the suite is green except one environmental failure (see b
 - `profile-bundle.mjs` — export a data root as a standalone directory to git init and push,
   import a cloned one and register it. Round-tripped a real 91-file profile byte-for-byte.
 - Ran the pipeline end to end on the real root: scan -> JD fetch -> two reports -> tracker ->
-  tailored CV. Findings are item 2 below and the `word:Lead` entry now in portals.yml.
+  tailored CV. Findings are item 1 below and the `word:Lead` entry now in portals.yml.
+- `pretriage.mjs` — 2,856 unreadable pipeline rows down to 200, deterministic and free.
+- Stripped the quarantined word from six archetypes; removed vote mechanics from the two
+  Outlier bullets while keeping the senior-reviewer authority.
+- Fixed `audit-portals.mjs` resolving `providers/` against the data root, which made every
+  board on a separate-root profile report `no-provider`.
+- Built Marilyn a `portals.yml` from her own trawl data: 14 of 16 boards live, first scan
+  returns 106 matches. Her search is unblocked.
 
 ## Left to do, roughly in order
 
-1. **Two decisions waiting on you** (see "Open questions" below).
-
-2. **A graduation-window gate.** The highest-value filter left, and the finding
+1. **A graduation-window gate.** The highest-value filter left, and the finding
    from actually running the pipeline. Most Summer 2027 JDs state a required
    graduation window, it is a hard yes/no rather than a score, and nothing checks
    it. On one day's Chicago listings: Northern Trust wants Dec 2027 - Summer 2028
@@ -35,14 +40,19 @@ the tree is clean and the suite is green except one environmental failure (see b
    with company, location or title. Needs a `graduation_window` block in
    portals.yml and a JD-text check, since it cannot be known from a listing row.
 
-3. **Web UI for the bullet library.** Pick a listing from the pipeline, rank bullets against
-   its keywords (`scoreAgainstKeywords` already exists), toggle them, compile. `compose-resume.mjs`
-   already owns the `.tex` write, so the UI drives it rather than editing files.
+2. **Scan cadence.** The discovered ledger only means anything across runs; every count in it
+   is still from a single run. `node scan-simplify.mjs --since 7` every three days is
+   zero-token. Not installed — say the word and it becomes a launchd job.
 
-4. **Marilyn's root has no `portals.yml`.** Scans under her profile have nothing to filter
-   with. The discovered ledger is meant to be how that root builds one, so this is partly
-   unblocked by item 1 — but she still needs a starting `title_filter`/`location_filter`
-   for revenue cycle / admin / training roles.
+3. **Export your LinkedIn connections** (yours, one click: Settings -> Data privacy -> Get a
+   copy of your data -> Connections). Drop `Connections.csv` in `data/` and `linkedin-join.mjs`
+   answers "who do I already know at a company in my funnel" offline, for free. It is built and
+   waiting on that file.
+
+4. **Web UI for the bullet library.** Pick a listing from the pipeline, rank bullets against
+   its keywords (`scoreAgainstKeywords` already exists), toggle them, compile. `compose-resume.mjs`
+   already owns the `.tex` write, so the UI drives it rather than editing files. Low priority —
+   the CLI already does this.
 
 5. **Bullet audit items still open** (from the pass over all bullets):
    - Kyndryl's long Kafka bullet is still function-only on most archetypes. Master supplies
@@ -58,12 +68,10 @@ the tree is clean and the suite is green except one environmental failure (see b
 
 ## Open questions for Jay
 
-1. **The word "process".** `QUARANTINE.md` marks it UNRESOLVED and says to strip it on the
-   next rebuild unless cleared. "Modernized a legacy semiconductor data export onto a
-   **process-based** JSON schema" is live on six archetypes (ai_engineer, data_engineer,
-   research_ga, solutions_architect, swe, tech_consultant) through one shared bullet. One
-   edit to `intel-corporation-modernized-legacy-semiconducto-6` fixes all six. Clear the word
-   or name the replacement.
+1. **Has PR 169 merged?** The `Modernized a legacy` advisory in `config/cv-facts.json` is a
+   standing prompt to re-confirm that before a PDF ships, and master says to fall back to
+   "Built the conversion pipeline that..." if it slipped. It was expected 2026-09-04. It is
+   the only advisory left firing on the composed CVs. Nobody but you can answer it.
 
 2. **The multi-sponsor scope bullet.** Added to the library as
    `intel-pm-sequenced-sponsor-projects` but deliberately NOT slotted into any resume:
