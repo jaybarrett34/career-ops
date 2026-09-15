@@ -23,13 +23,21 @@ async function handleGET(req: Request) {
   const today = new Date().toISOString().slice(0, 10);
   const prof = activeProfile();
 
+  // `kind` selects the contents in EVERY format. It used to apply only to CSV
+  // while json and xlsx always emitted both datasets -- but the filename is
+  // built from `kind` either way, so asking for the tracker downloaded
+  // "career-ops-tracker-<date>.xlsx" holding thousands of pipeline rows. A file
+  // whose name misdescribes its contents is worse than one that is simply large.
+  const wantTracker = kind === "tracker" || kind === "all";
+  const wantPipeline = kind === "pipeline" || kind === "all";
+
   if (format === "xlsx") {
     const rows = (cols: readonly { key: string; label: string }[], data: Record<string, unknown>[]) =>
       [cols.map((c) => c.label), ...data.map((d) => cols.map((c) => (d[c.key] ?? "") as string))];
-    const buf = buildXlsx([
-      { name: "Tracker", rows: rows(TRACKER_COLUMNS, readApplications() as unknown as Record<string, unknown>[]) },
-      { name: "Pipeline", rows: rows(PIPELINE_COLUMNS, readInbox() as unknown as Record<string, unknown>[]) },
-    ]);
+    const sheets = [];
+    if (wantTracker) sheets.push({ name: "Tracker", rows: rows(TRACKER_COLUMNS, readApplications() as unknown as Record<string, unknown>[]) });
+    if (wantPipeline) sheets.push({ name: "Pipeline", rows: rows(PIPELINE_COLUMNS, readInbox() as unknown as Record<string, unknown>[]) });
+    const buf = buildXlsx(sheets);
     return new Response(new Uint8Array(buf), {
       headers: {
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -47,8 +55,9 @@ async function handleGET(req: Request) {
     body = JSON.stringify({
       exportedAt: new Date().toISOString(),
       profile: { rootId: prof?.rootId ?? null, archetypeId: prof?.archetypeId ?? null },
-      tracker: readApplications(),
-      pipeline: readInbox(),
+      kind,
+      ...(wantTracker ? { tracker: readApplications() } : {}),
+      ...(wantPipeline ? { pipeline: readInbox() } : {}),
     }, null, 2);
     ext = "json";
   } else if (kind === "tracker") {

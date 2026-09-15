@@ -1,5 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 import { csvCell, toCsv, exportFilename, TRACKER_COLUMNS } from "../../src/lib/core/export.mjs";
 
 test("plain values pass through unquoted", () => {
@@ -61,4 +63,30 @@ test("no rows still produces a usable header", () => {
 test("filenames are dated and path-safe", () => {
   assert.equal(exportFilename("tracker", "csv", "2026-09-11"), "career-ops-tracker-2026-09-11.csv");
   assert.equal(exportFilename("../../etc/passwd", "csv", "2026-09-11"), "career-ops-etcpasswd-2026-09-11.csv");
+});
+
+test("kind selects the contents in every format, not only CSV", () => {
+  // The filename is built from `kind` in all three formats, so when json and
+  // xlsx ignored it you downloaded "career-ops-tracker-<date>.xlsx" holding
+  // thousands of pipeline rows. A file whose name misdescribes its contents is
+  // worse than one that is merely large.
+  const src = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../../src/app/api/export/route.ts"), "utf8");
+
+  // Both selectors exist and are derived from kind.
+  assert.match(src, /const wantTracker = kind === "tracker" \|\| kind === "all"/);
+  assert.match(src, /const wantPipeline = kind === "pipeline" \|\| kind === "all"/);
+
+  // The xlsx branch builds its sheet list conditionally rather than always both.
+  const xlsx = src.slice(src.indexOf('if (format === "xlsx")'), src.indexOf("let body"));
+  assert.match(xlsx, /if \(wantTracker\) sheets\.push/);
+  assert.match(xlsx, /if \(wantPipeline\) sheets\.push/);
+  // buildXlsx receives the array that was built conditionally, never an inline
+  // literal -- an inline literal is how both sheets shipped regardless of kind.
+  assert.match(xlsx, /buildXlsx\(sheets\)/);
+  assert.equal((xlsx.match(/sheets\.push/g) || []).length, 2, "each sheet is pushed once, behind its own guard");
+
+  // The json branch spreads each dataset behind its own selector.
+  assert.match(src, /\.\.\.\(wantTracker \? \{ tracker: readApplications\(\) \} : \{\}\)/);
+  assert.match(src, /\.\.\.\(wantPipeline \? \{ pipeline: readInbox\(\) \} : \{\}\)/);
 });
