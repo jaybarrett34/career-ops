@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { similarity, groupVariants, slugId, validateLibrary, selectBullets, scoreAgainstKeywords } from '../lib/bullets.mjs';
+import { similarity, groupVariants, slugId, validateLibrary, selectBullets, scoreAgainstKeywords, checkAuthorship } from '../lib/bullets.mjs';
 
 test('similarity ignores latex wrappers and punctuation', () => {
   assert.ok(similarity('\\textbf{Built} a pipeline', 'Built a pipeline') > 0.9);
@@ -79,4 +79,57 @@ test('keyword scoring counts distinct hits across text and tags', () => {
   assert.equal(scoreAgainstKeywords(b, ['jenkins', 'python', 'ci']), 3);
   assert.equal(scoreAgainstKeywords(b, ['kubernetes']), 0);
   assert.equal(scoreAgainstKeywords(b, []), 0);
+});
+
+test('an authorship verb on a role that did not author is refused', () => {
+  // The fabrication this catches is tool-of-trade conflation, and it is most
+  // tempting exactly where the best numbers live -- an evaluation role with
+  // volume metrics. Rule 22 in master said "do not do this"; prose does not
+  // enforce, so the check does.
+  const bad = checkAuthorship(
+    [{ id: 'x', org: 'Alignerr', text: 'Built CLI tooling across 20+ repos', short: null }],
+    { Alignerr: { reason: 'specified and evaluated' } },
+  );
+  assert.equal(bad.length, 1);
+  assert.match(bad[0], /"Built" claims authorship/);
+});
+
+test('the permitted framing passes', () => {
+  const ok = checkAuthorship(
+    [{ id: 'x', org: 'Alignerr', text: 'Specified and evaluated CLI tooling', short: null },
+     { id: 'y', org: 'Alignerr', text: 'Steered pre-release models to a PR-ready bar', short: null }],
+    { Alignerr: { reason: 'specified and evaluated' } },
+  );
+  assert.deepEqual(ok, []);
+});
+
+test('the limit is per-org, never global', () => {
+  // Intel is where he DID build; the check must not disarm his strongest verbs.
+  const ok = checkAuthorship(
+    [{ id: 'i', org: 'Intel Corporation', text: 'Built six CI/CD pipelines', short: null }],
+    { Alignerr: { reason: 'specified and evaluated' } },
+  );
+  assert.deepEqual(ok, []);
+});
+
+test('the short variant is checked too', () => {
+  // A long form can be careful while the short form someone wrote later is not,
+  // and the short form is what ships when the page overflows.
+  const bad = checkAuthorship(
+    [{ id: 'x', org: 'Alignerr', text: 'Specified and evaluated tooling', short: 'Built the tooling' }],
+    { Alignerr: { reason: 'specified and evaluated' } },
+  );
+  assert.equal(bad.length, 1);
+});
+
+test('an org may allow a specific verb', () => {
+  const ok = checkAuthorship(
+    [{ id: 'x', org: 'Alignerr', text: 'Designed the evaluation rubric', short: null }],
+    { Alignerr: { reason: 'specified and evaluated', allow: ['designed'] } },
+  );
+  assert.deepEqual(ok, []);
+});
+
+test('no limits declared means no check', () => {
+  assert.deepEqual(checkAuthorship([{ id: 'x', org: 'Anywhere', text: 'Built it', short: null }], undefined), []);
 });
