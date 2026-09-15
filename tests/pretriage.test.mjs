@@ -149,3 +149,18 @@ test('every row that does not survive carries a reason', () => {
   assert.equal(reasons.get(rows[1].index), 'off-domain title');
   assert.equal(reasons.get(rows[2].index), 'not an early-career posting');
 });
+
+test('reopen restores only the rows this tool retired', () => {
+  // The first run's weights would otherwise be permanent, and a row the user
+  // checked off by hand must never be un-checked.
+  const REOPEN = /^- \[x\] (.*?) \| pretriage: [^\n]*$/gm;
+  const before = [
+    '- [x] https://a.test/1 | Acme | SWE Intern | Chicago, IL | pretriage: below the shortlist cut',
+    '- [x] https://a.test/2 | Beta | SWE Intern | Chicago, IL',
+    '- [ ] https://a.test/3 | Gamma | SWE Intern | Chicago, IL',
+  ].join('\n');
+  const after = before.replace(REOPEN, '- [ ] $1').split('\n');
+  assert.equal(after[0], '- [ ] https://a.test/1 | Acme | SWE Intern | Chicago, IL');
+  assert.equal(after[1], '- [x] https://a.test/2 | Beta | SWE Intern | Chicago, IL', 'a hand-checked row must survive');
+  assert.equal(after[2], '- [ ] https://a.test/3 | Gamma | SWE Intern | Chicago, IL');
+});

@@ -192,12 +192,16 @@ function main() {
   node pretriage.mjs --term "summer 2027"    # bonus for the term you are actually searching
   node pretriage.mjs --on-domain             # drop titles that match no domain keyword in portals.yml
   node pretriage.mjs                      # apply: losers become - [x] with a reason
+  node pretriage.mjs --reopen             # undo a previous run, then re-rank from scratch
 
-Nothing is deleted. Losing rows are marked done with the reason appended.`);
+Nothing is deleted. Losing rows are marked done with the reason appended, and
+--reopen puts every one of them back so a later run with different weights can
+reconsider it. Rows you checked off by hand are never touched.`);
     return;
   }
 
   const keep = Number(arg('--keep', '200')) || 200;
+  const reopen = flag('--reopen');
   const near = String(arg('--near', 'chicago,tucson,phoenix,arizona,illinois,remote'))
     .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
   const dryRun = flag('--dry-run');
@@ -213,7 +217,19 @@ Nothing is deleted. Losing rows are marked done with the reason appended.`);
   const domainWords = domainKeywords(cfg.title_filter);
   const domain = domainWords.length ? buildTitleFilter({ positive: domainWords, negative: cfg.title_filter?.negative }) : null;
 
-  const src = fs.readFileSync(PIPELINE_PATH, 'utf8');
+  let src = fs.readFileSync(PIPELINE_PATH, 'utf8');
+
+  // Without this the FIRST run's weights are permanent: every row it retired is
+  // `- [x]` forever, so re-running with a tighter location or a different term
+  // can only ever see what the first run happened to keep. Only rows this tool
+  // marked are reopened -- the `| pretriage: ` suffix is the signature -- so a
+  // row the user checked off by hand stays checked off.
+  if (reopen) {
+    const before = (src.match(/^- \[x\].*\| pretriage: /gm) || []).length;
+    src = src.replace(/^- \[x\] (.*?) \| pretriage: [^\n]*$/gm, '- [ ] $1');
+    console.log(`Reopened ${before} row${before === 1 ? '' : 's'} from a previous pretriage run.`);
+  }
+
   const lines = src.split('\n');
   const rows = lines.map((l, i) => parseRow(l, i)).filter(Boolean);
   const open = rows.filter((r) => !r.done);
