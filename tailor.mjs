@@ -195,7 +195,7 @@ function main() {
     .map((id) => ({ id, org: o.org, restore: o.before.find((b) => !o.after.includes(b)) })));
 
   for (let attempt = 0; ; attempt++) {
-    writeResume(resFile, slug, base.template, ids);
+    writeResume(resFile, slug, base.template, ids, want);
     try {
       const log = execFileSync(process.execPath,
         [path.join(CODE, 'compose-resume.mjs'), '--resume', slug, '--out', out], { encoding: 'utf8' });
@@ -241,10 +241,14 @@ function main() {
 }
 
 /** Replace (or add) one named resume entry, leaving every other entry alone. */
-function writeResume(resFile, id, template, bullets) {
+function writeResume(resFile, id, template, bullets, tailoredFrom = null) {
   const doc = readYaml(resFile, { resumes: [] });
   doc.resumes = (doc.resumes ?? []).filter((x) => x.id !== id);
-  doc.resumes.push({ id, template, bullets });
+  // Recording the archetype it came from is what lets a reader -- and the
+  // Resumes page -- tell a hand-maintained foundational resume from one this
+  // tool generated for a single posting. Without it every entry looks equally
+  // authoritative and nobody knows which are safe to delete.
+  doc.resumes.push({ id, template, ...(tailoredFrom ? { tailored_from: tailoredFrom } : {}), bullets });
   fs.writeFileSync(resFile, yaml.dump(doc, { lineWidth: 120, noRefs: true }));
 }
 
