@@ -248,6 +248,7 @@ const SYSTEM_PATHS = [
   'lib/tex-sections.mjs',
   'compose-resume.mjs',
   'profile-bundle.mjs',
+  'pretriage.mjs',
   'scripts/seed-bullets.mjs',
   'scripts/check-syntax.mjs',
   'scripts/export-ats-text.mjs',
