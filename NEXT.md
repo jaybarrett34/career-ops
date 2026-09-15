@@ -68,12 +68,7 @@ the tree is clean and the suite is green except one environmental failure (see b
 
 ## Open questions for Jay
 
-1. **Has PR 169 merged?** The `Modernized a legacy` advisory in `config/cv-facts.json` is a
-   standing prompt to re-confirm that before a PDF ships, and master says to fall back to
-   "Built the conversion pipeline that..." if it slipped. It was expected 2026-09-04. It is
-   the only advisory left firing on the composed CVs. Nobody but you can answer it.
-
-2. **The multi-sponsor scope bullet.** Added to the library as
+1. **The multi-sponsor scope bullet.** Added to the library as
    `intel-pm-sequenced-sponsor-projects` but deliberately NOT slotted into any resume:
    "Carried concurrent automation projects for four sponsoring teams inside one engineering
    org, sequencing delivery against a sponsor-maintained roadmap." You called the
