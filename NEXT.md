@@ -68,13 +68,8 @@ the tree is clean and the suite is green except one environmental failure (see b
 
 ## Open questions for Jay
 
-1. **The multi-sponsor scope bullet.** Added to the library as
-   `intel-pm-sequenced-sponsor-projects` but deliberately NOT slotted into any resume:
-   "Carried concurrent automation projects for four sponsoring teams inside one engineering
-   org, sequencing delivery against a sponsor-maintained roadmap." You called the
-   12-projects/6-areas frame "incredibly gray area between job function and career wins" for
-   the tech archetypes. On a PM resume multi-stakeholder sequencing IS the job, which is why
-   it is written and waiting rather than dropped. Say the word and it goes in.
+Nothing blocking. The graduation-window gate (item 1 above) is the next build whenever
+you want it.
 
 ## Known failure, not ours
 
