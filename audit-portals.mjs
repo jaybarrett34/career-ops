@@ -54,7 +54,8 @@
  */
 
 import { existsSync, readFileSync } from 'fs';
-import { join } from 'path';
+import { dirname, join, resolve } from 'path';
+import { fileURLToPath } from 'url';
 import * as yaml from 'js-yaml';
 
 import { makeHttpCtx } from './providers/_http.mjs';
@@ -70,7 +71,15 @@ import { isMainModule } from './lib/is-main-module.mjs';
 // providers and report every board as `no-provider`.
 const ROOT = getCareerOpsRoot();
 const DEFAULT_PORTALS_PATH = process.env.CAREER_OPS_PORTALS || join(ROOT, 'portals.yml');
-const PROVIDERS_DIR = join(ROOT, 'providers');
+// providers/ is SYSTEM layer -- code -- so it resolves against this file, never
+// against the data root. It was `join(ROOT, 'providers')`, which is the exact
+// failure the comment above describes, just reached a different way: with a data
+// root configured (the documented multi-profile pattern), ROOT is the person's
+// data directory, which has no providers/. Zero providers load and every board
+// reports `no-provider` -- a config that scans fine is declared entirely broken.
+// scan.mjs, verify-portals.mjs and doctor.mjs all anchor to the code directory;
+// this one did not.
+const PROVIDERS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), 'providers');
 
 /** Boards at or under this many postings are worth a second look, not an error. */
 export const DEFAULT_SMALL_THRESHOLD = 5;
