@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import * as yaml from 'js-yaml';
 import zlib from 'node:zlib';
 import { validateLibrary, selectBullets, scoreAgainstKeywords } from './lib/bullets.mjs';
@@ -11,6 +12,16 @@ import { getCareerOpsRoot } from './path-resolver.mjs';
 import { isMainModule } from './lib/is-main-module.mjs';
 
 const ROOT = getCareerOpsRoot();
+
+/**
+ * What a built PDF was made of: the rendered text of every bullet, in order,
+ * plus the template. Anything that would change the page changes this; nothing
+ * else does.
+ */
+export function buildFingerprint(picked, template) {
+  const body = picked.map((b) => `${b.id}\u0000${b.rendered ?? b.text}`).join('\u0001');
+  return createHash('sha256').update(`${template}\u0002${body}`).digest('hex').slice(0, 32);
+}
 const arg = (n, d = null) => { const i = process.argv.indexOf(n); return i >= 0 && process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[i + 1] : d; };
 const flag = (n) => process.argv.includes(n);
 
@@ -122,6 +133,16 @@ function main() {
     const pdf = path.join(outDir, `${r.id}.pdf`);
     const pages = pageCount(pdf);
     if (pages === 1) {
+      // Record exactly what this PDF was built from. Staleness was previously
+      // inferred from config/resumes.yml's mtime, which is far too coarse:
+      // adding a field to ONE entry rewrote the file and marked all eleven PDFs
+      // out of date. A fingerprint of this resume's own inputs is exact, so an
+      // unrelated edit never invalidates it.
+      fs.writeFileSync(path.join(outDir, `${r.id}.build.json`), JSON.stringify({
+        builtAt: new Date().toISOString(),
+        preferShort,
+        fingerprint: buildFingerprint(picked, template),
+      }, null, 2) + '\n');
       console.log(`${r.id}: ${picked.length} bullets, 1 page -> ${pdf}`);
       return;
     }
