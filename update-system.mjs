@@ -249,6 +249,8 @@ const SYSTEM_PATHS = [
   'compose-resume.mjs',
   'profile-bundle.mjs',
   'pretriage.mjs',
+  'tailor.mjs',
+  'lib/tailor.mjs',
   'scripts/seed-bullets.mjs',
   'scripts/check-syntax.mjs',
   'scripts/export-ats-text.mjs',
