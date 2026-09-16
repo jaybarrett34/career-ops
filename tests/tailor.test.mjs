@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   covers, bulletCoverage, setCoverage, variantGroup, chooseByCoverage,
-  tailorResume, resumeVocabulary, keywordsFromJd,
+  tailorResume, resumeVocabulary, keywordsFromJd, hasOutcome, outcomeDensity,
 } from '../lib/tailor.mjs';
 
 const b = (id, org, text, extra = {}) => ({ id, org, text, tags: [], ...extra });
@@ -146,4 +146,56 @@ test('unique coverage and total mentions are reported separately', () => {
   const r = tailorResume(lib, ['a', 'weak'], ['Python', 'Azure DevOps']);
   assert.ok(r.coveredAfter.length > r.coveredBefore.length, 'a real unique gain drives the swap');
   assert.ok(r.mentionsAfter > r.mentionsBefore, 'and mentions rise with it');
+});
+
+test('an outcome clause is detected across the forms his bullets actually use', () => {
+  // The first detector matched "cutting" but not "cut" and called a good bullet
+  // outcome-free. A detector that misfires on real material argues for edits
+  // that make the page weaker, so the verb forms are pinned here.
+  for (const t of [
+    'Modernized the export so consumers migrated without a break',
+    'Standardized workflows to cut token spend on boilerplate prototyping',
+    'Containerized the stack, eliminating configuration drift',
+    'Rewrote the path in Python, emitting identical YAML so no downstream consumer had to change',
+    'Led a 4-person team yielding a 60% speed-up',
+    'Built six CI/CD pipelines, designing failure-path tests that surfaced a routing bug',
+    'iterating candidate outputs to a PR-ready bar',
+  ]) assert.equal(hasOutcome({ text: t }), true, t);
+});
+
+test('a bullet that only names the work has no outcome', () => {
+  for (const t of [
+    'Shipped a Python producer-consumer pipeline streaming ServiceNow data through Kafka',
+    'Coursework: Operating Systems, Analysis of Algorithms, Discrete Mathematics',
+    'Served as senior reviewer on a late-phase code evaluation project',
+    // Spelled-out counts are not outcomes: "six pipelines across five repos"
+    // says how much work, never what the work produced.
+    'Built six CI/CD pipelines across five repositories',
+  ]) assert.equal(hasOutcome({ text: t }), false, t);
+});
+
+test('the short variant counts, since it is what ships on an overflowing page', () => {
+  assert.equal(hasOutcome({ text: 'Did the work', short: 'Did the work, cutting spend' }), true);
+});
+
+test('a swap that trades an outcome for keywords is named, not buried', () => {
+  // The exact failure the governing principle warns about: the page gains
+  // keywords and loses the reason a human believes the claim.
+  const lib = [
+    { id: 'rich', org: 'Acme', text: 'Built the thing so the team shipped weekly', tags: [] },
+    { id: 'dense', org: 'Acme', text: 'Built with Python, Kafka, Docker and Terraform', tags: [] },
+  ];
+  const r = tailorResume(lib, ['rich'], ['Python', 'Kafka', 'Docker', 'Terraform']);
+  assert.deepEqual(r.ids, ['dense'], 'coverage still drives the swap');
+  assert.deepEqual(r.outcomeLost, ['rich'], 'and the cost is reported');
+  assert.equal(r.outcomeAfter.withOutcome, 0);
+});
+
+test('a swap that keeps the outcome reports no loss', () => {
+  const lib = [
+    { id: 'a', org: 'Acme', text: 'Built it so the team shipped weekly', tags: [] },
+    { id: 'b', org: 'Acme', text: 'Built it with Python so latency dropped', tags: [] },
+  ];
+  const r = tailorResume(lib, ['a'], ['Python']);
+  assert.deepEqual(r.outcomeLost, []);
 });
