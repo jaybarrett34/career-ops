@@ -129,7 +129,18 @@ function main() {
   console.log(`Unique coverage   ${r.coveredBefore.length}/${keywords.length} (${pct(r.coveredBefore.length)})`
     + `  ->  ${r.coveredAfter.length}/${keywords.length} (${pct(r.coveredAfter.length)})`);
   console.log(`Total mentions    ${r.mentionsBefore}  ->  ${r.mentionsAfter}`
-    + '   (how often the page says them; what keyword-weighted ATS scoring sees)\n');
+    + '   (how often the page says them; what keyword-weighted ATS scoring sees)');
+  // The human half. Both numbers above are ATS metrics and a page can improve on
+  // them while getting worse to read -- the reader decides whether you have done
+  // the job, and they decide on outcomes, not term frequency.
+  console.log(`Bullets w/ outcome ${r.outcomeBefore.withOutcome}/${r.outcomeBefore.total}`
+    + `  ->  ${r.outcomeAfter.withOutcome}/${r.outcomeAfter.total}`
+    + '   (says what the work produced, not just what it was)\n');
+  if (r.outcomeLost.length) {
+    console.log(`  WARNING: ${r.outcomeLost.length} bullet(s) with an outcome were swapped out for keyword coverage:`);
+    for (const id of r.outcomeLost) console.log(`    ${id}`);
+    console.log('  Keywords got you read; outcomes get you interviewed. Reconsider these.\n');
+  }
 
   for (const o of r.perOrg) {
     const swapped = o.after.filter((id) => !o.before.includes(id));
