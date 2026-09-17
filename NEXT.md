@@ -66,6 +66,16 @@ the tree is clean and the suite is green except one environmental failure (see b
 6. **Yours, not mine:** the Simplify Outlier text and headline still need fixing, and
    PRs #4064/#4065 are waiting on upstream maintainers.
 
+## Parked — worth doing, not now
+
+- **The test-engineering angle.** 150 of the 231 lines in PR #4064 were tests, which is a
+  differentiated fit for QA/test-engineering roles Jay is not currently targeting. 24 such
+  Summer 2027 postings exist; 4 are in his metro — three at Shure (Niles/Skokie, same iCIMS
+  tenant he is already opening an account on) and Motorola Test Engineer Intern (Illinois).
+  Jay 2026-09-17: "might be worth utilizing eventually." Not a build — it needs a decision
+  about whether he wants to be read as a test-engineering candidate, and probably a variant
+  of the swe archetype that leads with the testing work rather than the schema migration.
+
 ## Open questions for Jay
 
 Nothing blocking. The graduation-window gate (item 1 above) is the next build whenever
