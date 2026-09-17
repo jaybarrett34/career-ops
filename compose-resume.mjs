@@ -123,7 +123,20 @@ function main() {
 
   // Try full-length first; fall back to short variants only if the page overflows.
   for (const preferShort of [false, true]) {
-    fs.writeFileSync(texOut, renderTex(template, byOrg, preferShort));
+    const rendered = renderTex(template, byOrg, preferShort);
+    // A heading whose bullets did not match keeps the TEMPLATE's own content,
+    // which is usually fine -- but a scaffold left behind while wiring a new
+    // entry then ships silently into a PDF someone sends. That happened: an
+    // \href in a heading changed the key the scanner derives, no bullet matched,
+    // and the placeholder rendered with no error anywhere.
+    const scaffold = /PLACEHOLDER|\bTODO\b|\bFIXME\b|\bLOREM\b/i.exec(rendered);
+    if (scaffold) {
+      console.error(`${r.id}: refusing to build -- "${scaffold[0]}" is still in the rendered .tex.`);
+      console.error('A heading\'s bullets did not match, so the template\'s own text was kept.');
+      console.error('Check that each bullet\'s `org` equals the heading key (node compose-resume.mjs --list).');
+      process.exit(2);
+    }
+    fs.writeFileSync(texOut, rendered);
     if (flag('--dry-run')) { console.log(`wrote ${texOut} (dry run)`); return; }
     try {
       execFileSync('tectonic', ['-X', 'compile', texOut, '--outdir', outDir], { stdio: 'ignore' });

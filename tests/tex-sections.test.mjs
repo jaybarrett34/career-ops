@@ -59,3 +59,35 @@ test('escaped braces inside an argument do not end it early', () => {
   const s = '\\section{Skills \\& Tools}';
   assert.equal(headings(s)[0].key, 'SECTION: Skills & Tools');
 });
+
+test('a linked heading keys on its label, not its URL', () => {
+  // \href{url}{label} in a heading put the URL into the key -- "PROJECT:
+  // https://github.com/.../pull/4064career-ops" -- so no bullet matched and the
+  // template's placeholder rendered into the PDF with no error raised.
+  const tex = [
+    '\\section{Projects}',
+    '  \\resumeProjectHeading',
+    '  {\\href{https://github.com/o/r/pull/4064}{\\underline{\\textbf{career-ops}}} $|$ \\emph{Node.js}}{September 2026}',
+    '  \\resumeItemListStart',
+    '  \\resumeItem{x}',
+    '  \\resumeItemListEnd',
+  ].join('\n');
+  const keys = headings(tex).map((h) => h.key);
+  assert.ok(keys.includes('PROJECT: career-ops'), keys.join(' | '));
+  assert.ok(!keys.some((k) => k.includes('http')), 'no key may carry a URL');
+});
+
+test('an unlinked heading is unchanged by the href handling', () => {
+  const tex = '\\resumeProjectHeading\n  {\\textbf{MovieMatch} $|$ \\emph{Next.js}}{February 2026}';
+  assert.deepEqual(headings(tex).map((h) => h.key), ['PROJECT: MovieMatch']);
+});
+
+test('unbalanced markup yields no heading rather than a wrong one', () => {
+  // The reader cannot find a balanced pair, so it emits nothing. That is the
+  // safe direction: a missing heading means no bullet matches and compose-resume
+  // refuses to build, where a GUESSED heading would silently misfile bullets
+  // under the wrong employer.
+  const tex = '\\resumeProjectHeading\n  {\\href{ \\textbf{Thing}}{2026}';
+  assert.doesNotThrow(() => headings(tex));
+  assert.deepEqual(headings(tex), []);
+});
