@@ -110,6 +110,12 @@ export const PIPELINE_PATH = process.env.CAREER_OPS_PIPELINE || path.join(DATA_R
 const APPLICATIONS_PATH = path.join(DATA_ROOT, 'data/applications.md');
 const PROVIDERS_DIR = path.resolve(CODE_ROOT, 'providers');
 
+// Fraction of configured entries that must resolve to a provider before a scan
+// is meaningful. Adapted from a sibling session's scope-staleness failure: a
+// cron kept reporting correctly on two dead accounts while a live one went
+// unwatched, because the job validated its inputs but never its own scope.
+export const COVERAGE_FLOOR = 0.5;
+
 // Ensure required directories exist (fresh setup). Stays rooted in the user-data
 // directory; override parents are created by their writers before first write.
 const targetDataDir = path.join(DATA_ROOT, 'data');
@@ -2752,7 +2758,7 @@ function guardStatusFor(code) {
 const KNOWN_FLAGS = [
   '--dry-run', '--verify', '--headed-fallback', '--throttle', '--rediscover-404',
   '--include-blacklisted', '--company', '--posted-after', '--posted-before',
-  '--since', '--quiet', '--json', '--help', '-h',
+  '--since', '--quiet', '--json', '--help', '-h', '--ignore-coverage',
 ];
 
 // Flags whose space-separated value is the NEXT argv token (the `--flag=value`
@@ -2971,6 +2977,27 @@ async function main() {
   parts.push(`${localParserCount} local parser`);
   parts.push(`${skippedCount} skipped — no provider matched`);
   console.log(`Scanning ${parts.join('; ')} via providers`);
+
+  // A scan that silently covers a fraction of its declared surface is
+  // indistinguishable from a scan that found nothing. Reporting the skip count
+  // in a line above is not enough -- it scrolls past, and the run then proceeds
+  // and prints a confident summary about the sliver that resolved. So the
+  // coverage floor HALTS rather than warns.
+  //
+  // Threshold is declared here rather than inferred: below it, the config no
+  // longer describes what is being scanned, which is a config bug and not a
+  // quiet day.
+  const declared = targets.length + skippedCount;
+  const coverage = declared > 0 ? targets.length / declared : 1;
+  if (declared > 0 && coverage < COVERAGE_FLOOR && !args.includes('--ignore-coverage')) {
+    console.error(`\nRefusing to scan: only ${targets.length} of ${declared} configured entries `
+      + `(${Math.round(coverage * 100)}%) resolve to a provider, below the ${Math.round(COVERAGE_FLOOR * 100)}% floor.`);
+    console.error('Those entries are skipped on EVERY run while still reading as coverage, so a');
+    console.error('thin result here would look like a quiet market rather than a broken config.');
+    console.error('\n  node audit-portals.mjs        # which entries resolve, and to what');
+    console.error('  node scan.mjs --ignore-coverage   # scan anyway, knowing the surface is partial');
+    process.exit(2);
+  }
   if (dryRun) console.log('(dry run — no files will be written)\n');
 
   // 3.5. Load the user's do-not-apply list (#1742). Opt-in: absent file =
