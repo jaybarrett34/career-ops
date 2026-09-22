@@ -90,6 +90,10 @@ test fails the same way for the same reason.
 ## Commands
 
 ```
+./scripts/career-ops-dev.sh          # restart the web UI and open it
+./scripts/career-ops-dev.sh --clean  # same, but clear .next first (stale CSS)
+open ~/Applications/"Career Ops.app" # same thing, dockable
+
 node scan-simplify.mjs --list summer2027 --since 90 --dry-run   # trawl, writes nothing
 node scan-simplify.mjs --promote                                # promoted: true -> portals.yml
 node audit-portals.mjs                                          # does each careers_url resolve

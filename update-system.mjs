@@ -252,6 +252,7 @@ const SYSTEM_PATHS = [
   'pretriage.mjs',
   'tailor.mjs',
   'lib/tailor.mjs',
+  'scripts/career-ops-dev.sh',
   'scripts/seed-bullets.mjs',
   'scripts/check-syntax.mjs',
   'scripts/export-ats-text.mjs',
