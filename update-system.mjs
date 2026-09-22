@@ -244,6 +244,7 @@ const SYSTEM_PATHS = [
   'scan-simplify.mjs',
   'lib/bullets.mjs',
   'lib/discovered.mjs',
+  'lib/evidence.mjs',
   'lib/xlsx.mjs',
   'lib/tex-sections.mjs',
   'compose-resume.mjs',
