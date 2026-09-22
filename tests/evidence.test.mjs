@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   pearson, spearman, ranks, dropTail, robustCorrelation,
-  monotonicity, claimsAvailable, correctedAlpha, countComparisons,
+  monotonicity, claimsAvailable, correctedAlpha, countComparisons, unverifiedClaims,
 } from '../lib/evidence.mjs';
 
 test('the outlier case: a correlation carried by one point is called unstable', () => {
@@ -86,4 +86,34 @@ test('the budget ledger counts entries, not comments or the header', () => {
     '2026-09-21\tscore vs response\t', '2026-09-22\tats vs advance\t'].join('\n');
   assert.equal(countComparisons(tsv), 2);
   assert.equal(countComparisons(''), 0);
+});
+
+test('a figure without a verified stamp is reported; a stamped one is not', () => {
+  const bullets = [
+    { id: 'a', org: 'Acme', text: 'Built six pipelines across five repositories' },
+    { id: 'b', org: 'Acme', text: 'Cut latency by 60%', verified: '2026-09-22 user-stated' },
+    { id: 'c', org: 'Acme', text: 'Shipped the migration' },
+  ];
+  const u = unverifiedClaims(bullets);
+  assert.deepEqual(u.map((x) => x.id), ['a']);
+});
+
+test('a bare year is not a quantified claim', () => {
+  // "Summer 2027" and "Python 3.13" must not demand confirmation; they are not
+  // assertions about scale or outcome.
+  assert.deepEqual(unverifiedClaims([{ id: 'y', org: 'A', text: 'Interned in 2026' }]), []);
+});
+
+test('the real library has no unstamped figures', async () => {
+  // The regression this guards: a count master itself flagged UNVERIFIED shipped
+  // on resumes for weeks, because nothing computed it and nothing could fail.
+  const fs = await import('node:fs');
+  const yaml = await import('js-yaml');
+  const { validateLibrary } = await import('../lib/bullets.mjs');
+  const path = new URL('../config/bullets.yml', import.meta.url).pathname;
+  if (!fs.existsSync(path)) return; // user-layer file, absent in a bare checkout
+  const lib = validateLibrary(yaml.load(fs.readFileSync(path, 'utf8'))).bullets;
+  const u = unverifiedClaims(lib);
+  assert.deepEqual(u.map((c) => `${c.org}: ${c.figure}`), [],
+    'every figure on a resume must carry a verified stamp');
 });
