@@ -708,7 +708,10 @@ async function main() {
     console.error('Error: portals.yml not found. Run onboarding first — the reverse scan reuses its title_filter/location_filter.');
     process.exit(1);
   }
-  const config = yaml.load(readFileSync(PORTALS_PATH, 'utf-8'));
+  // An empty or comment-only portals file is a config that constrains nothing,
+  // not a failure: js-yaml returns undefined for it and every downstream read
+  // then throws. The Explorer writes exactly such a file when no filters are set.
+  const config = yaml.load(readFileSync(PORTALS_PATH, 'utf-8')) ?? {};
   const fullTitleFilterConfig = resolveTitleFilterConfig(config);
   // title_filter_overrides is independent of title_filter_full: it broadens
   // the net for specific companies on top of whichever title filter config

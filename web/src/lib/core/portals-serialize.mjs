@@ -29,7 +29,14 @@ function block(key, items) {
  * @returns {string}
  */
 export function serializePortals(f) {
+  // `tracked_companies: []` is emitted UNCONDITIONALLY so the file is always a
+  // valid YAML document. With every filter list empty this produced a
+  // comment-only file, and js-yaml treats comment-only as an EMPTY DOCUMENT and
+  // throws "expected a document, but the input is empty" -- so an Explorer
+  // search with no filters set crashed the scanner outright. A config that
+  // constrains nothing is a legitimate request for everything, not a parse error.
   let out = "# Ephemeral Explorer filters — generated per-search, safe to delete.\n";
+  out += "tracked_companies: []\n";
   if (f.positive.length || f.negative.length) {
     out += "title_filter:\n";
     out += block("positive", f.positive);
