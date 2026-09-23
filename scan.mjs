@@ -2886,7 +2886,10 @@ async function main() {
 
   let rawConfig;
   try {
-    rawConfig = parseYaml(readFileSync(PORTALS_PATH, 'utf-8'));
+    // An empty or comment-only portals file constrains nothing; js-yaml returns
+    // undefined for it and every downstream read then throws. The Explorer
+    // writes exactly such a file when no filters are set.
+    rawConfig = parseYaml(readFileSync(PORTALS_PATH, 'utf-8')) ?? {};
   } catch (err) {
     console.error(`Error: failed to parse ${PORTALS_PATH}: ${err.message}`);
     process.exit(1);
