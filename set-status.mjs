@@ -92,6 +92,7 @@
 import { readFileSync, existsSync, appendFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { getCareerOpsRoot } from './path-resolver.mjs';
 import { extractTrackerReportNumbers, resolveColumns, parseTrackerRow, normalizeTextKey } from './tracker-parse.mjs';
 import { roleFuzzyMatch } from './role-matcher.mjs';
 import { localToday } from './lib/local-today.mjs';
@@ -100,6 +101,8 @@ import {
   normalizeCompany, cell, CLI_EXIT, makeCliFailWith, acquireTrackerLockForCli,
 } from './tracker-utils.mjs';
 
+// CODE and DATA are different roots and this file needs both. states.yml ships
+// with the code; the tracker belongs to whichever PERSON is active.
 const CAREER_OPS = dirname(fileURLToPath(import.meta.url));
 const STATES_FILE = join(CAREER_OPS, 'templates/states.yml');
 
@@ -260,7 +263,15 @@ if (!newStatus) {
 
 // ── tracker access ───────────────────────────────────────────────
 
-const APPS_FILE = resolveTrackerPath(CAREER_OPS);
+// Resolved against the DATA root, not the code directory. It was the code
+// directory, which meant CAREER_OPS_ROOT and the .career-ops-data marker were
+// ignored entirely: every status change written while a second profile was
+// active landed in the first profile's tracker. On a multi-profile install that
+// is a silent cross-person write, and it cannot be noticed from the output --
+// the confirmation line names the row it actually edited, in the other person's
+// file. Found when a scratch-root test reported success against a scratch
+// tracker that never changed, while the real one did.
+const APPS_FILE = resolveTrackerPath(getCareerOpsRoot());
 if (!existsSync(APPS_FILE)) {
   failWith(EXIT_NOT_FOUND, 'no-tracker', `No tracker found at ${APPS_FILE}`);
 }

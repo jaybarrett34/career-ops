@@ -247,6 +247,8 @@ const SYSTEM_PATHS = [
   'lib/evidence.mjs',
   'lib/eligibility.mjs',
   'lib/xlsx.mjs',
+  'lib/xlsx-read.mjs',
+  'workbook.mjs',
   'lib/tex-sections.mjs',
   'compose-resume.mjs',
   'profile-bundle.mjs',
