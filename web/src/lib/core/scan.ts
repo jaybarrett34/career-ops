@@ -172,7 +172,30 @@ function runAtsDiscovery(filters: ExploreFilters, onEvent: (e: ScanEvent) => voi
     let unreachable = 0;
     let outBuf = "";
     let errBuf = "";
-    let jsonOut = ""; // --json mode: the single stdout object accumulates here
+    let jsonOut = ""; // --json mode: NDJSON buffer, split on newlines below
+    let lastSummary: ScanJson | null = null;
+
+    // Shared by the per-source stream and the terminal summary, so a posting is
+    // recorded once regardless of which arrived first.
+    const takeOffers = (list: JsonOffer[], fallbackSource?: string) => {
+      for (const o of list) {
+        const url = (o.url || "").trim();
+        if (!url || seen.has(url) || !o.company || !o.title) continue;
+        seen.add(url);
+        const offer: DiscoveredOffer = {
+          company: o.company,
+          title: o.title,
+          url,
+          location: o.location || "",
+          postedAt: o.postedAt || "",
+          ats: o.source || fallbackSource || currentAts,
+          source: o.source || `${fallbackSource || currentAts}-full`,
+          matchedKeyword: firstMatch(o.title, filters.positive),
+        };
+        offers.push(offer);
+        onEvent({ kind: "offer", offer });
+      }
+    };
 
     let timedOut = false;
     const killer = setTimeout(() => {
@@ -259,7 +282,26 @@ function runAtsDiscovery(filters: ExploreFilters, onEvent: (e: ScanEvent) => voi
 
     child.stdout.on("data", (d: Buffer) => {
       if (useJson) {
-        jsonOut += d.toString(); // one JSON object — parsed at close
+        // NDJSON: a `source-done` line per source as it completes, then one
+        // `summary`. Consuming the per-source lines as they arrive is what
+        // makes a stopped sweep keep its results -- holding everything for the
+        // summary meant a 230s kill discarded work already done.
+        jsonOut += d.toString();
+        const lines = jsonOut.split("\n");
+        jsonOut = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const msg = JSON.parse(line) as ScanJson & { kind?: string; source?: string };
+            if (msg.kind === "source-done" && Array.isArray(msg.offers)) {
+              takeOffers(msg.offers, msg.source);
+            } else {
+              lastSummary = msg;
+            }
+          } catch {
+            /* a partial line; the next chunk completes it */
+          }
+        }
         return;
       }
       outBuf += d.toString();
@@ -288,16 +330,19 @@ function runAtsDiscovery(filters: ExploreFilters, onEvent: (e: ScanEvent) => voi
       clearTimeout(killer);
       cleanupTempPortals(tempPortals);
       if (useJson) {
-        let j: ScanJson | null = null;
-        try {
-          j = JSON.parse(jsonOut.trim()) as ScanJson;
-        } catch {
-          // The scanner writes ONE json object, at the very end. Killed before
-          // that, stdout holds a truncated fragment -- so a parse failure here
-          // almost always means the timeout fired, not that the scanner is
-          // broken. Saying "no readable output" sent the reader hunting for a
-          // bug in a scan that was simply too slow to finish.
-          j = null;
+        // Whatever is left in the buffer is the trailing line, if any; the
+        // per-source lines were already consumed as they arrived.
+        let j: ScanJson | null = lastSummary;
+        const rest = jsonOut.trim();
+        if (rest) {
+          try {
+            j = JSON.parse(rest) as ScanJson;
+          } catch {
+            // A truncated trailing line means the process was stopped mid-write.
+            // That is no longer fatal: every source that FINISHED already handed
+            // its offers over, so we keep those and report the sweep as partial
+            // rather than discarding work the scan actually did.
+          }
         }
         if (j && Array.isArray(j.offers)) {
           for (const o of j.offers) {

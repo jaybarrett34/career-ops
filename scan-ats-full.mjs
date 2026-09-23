@@ -640,6 +640,25 @@ export async function parallelEach(items, limit, fn, onItemDone = null, shouldSt
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, () => worker()));
 }
 
+/**
+ * The wire shape of one offer. ONE definition, used by both the per-source
+ * stream and the terminal summary -- two copies would drift and a caller would
+ * silently get different fields depending on whether the sweep finished.
+ */
+export function serializeOffer(o) {
+  return {
+    company: o.company,
+    title: o.title,
+    url: o.url,
+    location: o.location || null,
+    postedAt: o.postedAt ? new Date(o.postedAt).toISOString().slice(0, 10) : null,
+    dateStatus: o.dateStatus || (o.postedAt ? 'dated' : 'unknown'),
+    blacklisted: Boolean(o.blacklisted),
+    note: o.note || null,
+    source: o.source,
+  };
+}
+
 // ── Liveness verification (reuses liveness-browser.mjs) ────────────
 
 async function filterLive(offers) {
@@ -1067,6 +1086,30 @@ async function main() {
       writeCheckpoint({ ...checkpointBase(), current: null, counters: snapshotCounters() });
     }
     log(`\n  done (${errors} unreachable boards, ${deadBoardsSkipped} retired boards skipped)`);
+    // Hand this source's results over the moment it finishes, as one NDJSON
+    // line, rather than holding everything for the terminal summary.
+    //
+    // The summary is written ONCE, at the very end. A caller that stops a long
+    // sweep -- the web route kills it at 230s -- therefore received a truncated
+    // object, failed to parse it, and reported "no readable output" while
+    // discarding every posting already found. The work was done and thrown
+    // away. Emitting per source means a stopped sweep still yields whatever
+    // completed, and the reader has real counts to show while it runs.
+    //
+    // Blacklist filtering is applied here so a streamed row is never one the
+    // final summary would drop. Liveness is not: it is opt-in (--liveness) and
+    // makes network calls, so a streamed row is "matched and not blacklisted",
+    // which the `partial` flag says plainly.
+    if (opts.json) {
+      const soFar = filterBlacklistedOffers(newOffers, blacklist, { includeBlacklisted: opts.includeBlacklisted }).offers;
+      process.stdout.write(JSON.stringify({
+        kind: 'source-done',
+        source: name,
+        partial: true,
+        livenessChecked: Boolean(opts.liveness),
+        offers: soFar.map(serializeOffer),
+      }) + '\n');
+    }
   }
 
   // ── VC portfolio seed sources (--seeds flag) ───────────────────────
@@ -1193,17 +1236,8 @@ async function main() {
       cappedBoards,
       dnsPacing: { delayed: pacing.delayed, waitedMs: Math.round(pacing.waitedMs) },
       saved,
-      offers: offers.map(o => ({
-        company: o.company,
-        title: o.title,
-        url: o.url,
-        location: o.location || null,
-        postedAt: o.postedAt ? new Date(o.postedAt).toISOString().slice(0, 10) : null,
-        dateStatus: o.dateStatus || (o.postedAt ? 'dated' : 'unknown'),
-        blacklisted: Boolean(o.blacklisted),
-        note: o.note || null,
-        source: o.source,
-      })),
+      offers: offers.map(serializeOffer),
+
     }) + '\n');
     return;
   }

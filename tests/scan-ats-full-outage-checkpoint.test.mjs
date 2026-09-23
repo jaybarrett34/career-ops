@@ -27,6 +27,22 @@ import { join } from 'path';
 import { pathToFileURL } from 'url';
 import { pass, fail, run, formatRunFailure, NODE, ROOT } from './helpers.mjs';
 
+// --json stdout is NDJSON now: one `source-done` line per completed source, so a
+// sweep stopped part-way still hands over what finished, then the terminal
+// summary. These assertions want the summary -- the last parseable non-stream
+// line -- not whatever happens to be first.
+function summaryOf(out) {
+  const lines = String(out).split('\n').filter((l) => l.trim());
+  for (let i = lines.length - 1; i >= 0; i--) {
+    try {
+      const d = JSON.parse(lines[i]);
+      if (d && d.kind !== 'source-done') return d;
+    } catch { /* partial or stream line; keep walking back */ }
+  }
+  throw new Error('no summary object on stdout');
+}
+
+
 console.log('\nscan-ats-full — a resolver-outage stop keeps its checkpoint (#2283)');
 
 // Comfortably above RESOLVER_FAILURE_LIMIT (50) so the breaker trips with
@@ -143,7 +159,7 @@ function sweep(dir, dnsCode, extraArgs = []) {
       // stored, and the resume point are all the same number. A counter left at
       // the full slice shows up as companiesScanned > resumeAt — unattempted
       // boards reported as scanned, and double-counted again on resume.
-      const result = JSON.parse(out);
+      const result = summaryOf(out);
       const stored = cp.counters?.totalCompaniesScanned;
       if (result.companiesScanned === at && stored === at) {
         pass(`interrupted run counts only what it attempted (${result.companiesScanned} = checkpoint ${stored} = resumeAt ${at})`);
@@ -170,7 +186,7 @@ function sweep(dir, dnsCode, extraArgs = []) {
       if (resumed === null) {
         fail(`--resume after an outage stop failed${formatRunFailure()}`);
       } else {
-        const { companiesScanned, resumed: wasResumed } = JSON.parse(resumed);
+        const { companiesScanned, resumed: wasResumed } = summaryOf(resumed);
         if (!wasResumed || companiesScanned !== COMPANIES) {
           fail(`resumed run miscounted: resumed=${wasResumed} companiesScanned=${companiesScanned}, expected ${COMPANIES}`);
         } else if (existsSync(cpPath)) {
@@ -197,8 +213,8 @@ function sweep(dir, dnsCode, extraArgs = []) {
       fail(`clean sweep did not complete${formatRunFailure()}`);
     } else if (existsSync(cpPath)) {
       fail('a completed sweep left its checkpoint behind — the next run will demand --resume');
-    } else if (JSON.parse(out).stoppedByOutage !== false) {
-      fail(`a completed sweep reported stoppedByOutage=${JSON.parse(out).stoppedByOutage}`);
+    } else if (summaryOf(out).stoppedByOutage !== false) {
+      fail(`a completed sweep reported stoppedByOutage=${summaryOf(out).stoppedByOutage}`);
     } else {
       pass('a completed sweep still deletes its checkpoint and reports no outage stop');
     }
@@ -220,7 +236,7 @@ function sweep(dir, dnsCode, extraArgs = []) {
     if (out === null) {
       fail(`retired-board count sweep did not complete${formatRunFailure()}`);
     } else {
-      const result = JSON.parse(out);
+      const result = summaryOf(out);
       if (result.companiesScanned === COMPANIES - 1 && result.retiredBoardsSkipped === 1) {
         pass(`retired boards are excluded from companiesScanned (${result.companiesScanned}) and reported separately`);
       } else {
@@ -244,12 +260,12 @@ function sweep(dir, dnsCode, extraArgs = []) {
     if (out === null) {
       fail(`dead-board cache failure aborted the sweep${formatRunFailure()}`);
     } else if (
-      JSON.parse(out).companiesScanned === COMPANIES
+      summaryOf(out).companiesScanned === COMPANIES
       && !existsSync(join(dir, 'data', 'dead-boards.tsv'))
     ) {
       pass('dead-board cache failure is best-effort and does not abort the sweep');
     } else {
-      fail(`dead-board cache failure changed the scan count: ${JSON.parse(out).companiesScanned}`);
+      fail(`dead-board cache failure changed the scan count: ${summaryOf(out).companiesScanned}`);
     }
   } finally {
     rmSync(dir, { recursive: true, force: true });
