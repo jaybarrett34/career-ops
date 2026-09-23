@@ -78,7 +78,7 @@ const flag = (name) => process.argv.includes(name);
 
 function usage() {
   console.log(`Usage:
-  node scan-simplify.mjs                      # all lists, postings from the last 7 days
+  node scan-simplify.mjs                      # all lists, postings from the last 90 days
   node scan-simplify.mjs --list summer2027    # one list (${Object.keys(LISTS).join(', ')})
   node scan-simplify.mjs --since 30           # widen the posting window
   node scan-simplify.mjs --dry-run            # preview, write nothing
@@ -196,7 +196,10 @@ async function main() {
     process.exit(1);
   }
   const chosen = which ? [which] : Object.keys(LISTS);
-  const sinceDays = Number(arg('--since', '7'));
+  // 90 days, not 7. Late in a hiring cycle a posting from three months ago is
+  // still open, and a one-week default hid most of the live market from every
+  // run -- the failure looked like "nothing new" rather than "wrong window".
+  const sinceDays = Number(arg('--since', '90'));
   const cutoffMs = Number.isFinite(sinceDays) && sinceDays > 0 ? Date.now() - sinceDays * 86400_000 : null;
   const limit = Number(arg('--limit', '0')) || Infinity;
   // --json implies --dry-run: a caller parsing stdout wants the candidates, not
