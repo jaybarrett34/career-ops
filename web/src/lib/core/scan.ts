@@ -174,7 +174,9 @@ function runAtsDiscovery(filters: ExploreFilters, onEvent: (e: ScanEvent) => voi
     let errBuf = "";
     let jsonOut = ""; // --json mode: the single stdout object accumulates here
 
+    let timedOut = false;
     const killer = setTimeout(() => {
+      timedOut = true;
       try {
         child.kill("SIGTERM");
       } catch {
@@ -290,6 +292,11 @@ function runAtsDiscovery(filters: ExploreFilters, onEvent: (e: ScanEvent) => voi
         try {
           j = JSON.parse(jsonOut.trim()) as ScanJson;
         } catch {
+          // The scanner writes ONE json object, at the very end. Killed before
+          // that, stdout holds a truncated fragment -- so a parse failure here
+          // almost always means the timeout fired, not that the scanner is
+          // broken. Saying "no readable output" sent the reader hunting for a
+          // bug in a scan that was simply too slow to finish.
           j = null;
         }
         if (j && Array.isArray(j.offers)) {
@@ -324,7 +331,14 @@ function runAtsDiscovery(filters: ExploreFilters, onEvent: (e: ScanEvent) => voi
         } else {
           // --json requested but stdout didn't parse — surface honestly rather than
           // silently returning 0 (defensive; shouldn't happen once the probe passed).
-          onEvent({ kind: "error", message: "The scanner returned no readable output." });
+          onEvent({
+            kind: "error",
+            message: timedOut
+              ? `${ats.join(", ")} ran past the ${Math.round(230_000 / 1000)}s limit and was stopped, so its results were lost. `
+                + "Workday sweeps the whole public tenant directory and usually cannot finish — deselect it, "
+                + "or lower the per-source limit."
+              : "The scanner returned no readable output.",
+          });
         }
         resolve(offers);
         return;

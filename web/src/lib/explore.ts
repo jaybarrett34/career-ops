@@ -17,6 +17,16 @@ export const SIMPLIFY_SOURCES: SimplifySource[] = ["simplify-summer2027", "simpl
 export const isSimplifySource = (s: string): s is SimplifySource =>
   (SIMPLIFY_SOURCES as string[]).includes(s);
 export const ATS_SOURCES: DiscoverSource[] = ["greenhouse", "lever", "ashby", "workday", ...SIMPLIFY_SOURCES];
+
+// Sources a default run can actually FINISH. The route kills the scanner at
+// 230s; greenhouse/lever/ashby complete in ~15/30/6s and Simplify is one HTTPS
+// GET, but a Workday sweep walks its whole public tenant directory and runs
+// past the kill. Killed mid-write, its single terminal JSON object arrives
+// truncated, fails to parse, and the run reports "no readable output" after
+// discarding every posting it had already found -- a timeout wearing a parse
+// error's clothes. Workday stays selectable; it is no longer the default.
+export const SLOW_SOURCES: DiscoverSource[] = ["workday"];
+export const DEFAULT_ATS_SOURCES: DiscoverSource[] = ATS_SOURCES.filter((s) => !SLOW_SOURCES.includes(s));
 export const ATS_LABEL: Record<DiscoverSource, string> = {
   greenhouse: "Greenhouse",
   lever: "Lever",
@@ -52,8 +62,10 @@ export const DEFAULT_FILTERS: ExploreFilters = {
   block: [],
   blockHard: [],
   alwaysAllow: [],
-  sinceDays: 7,
-  ats: [...ATS_SOURCES],
+  // 90 days, not 7: it is late September on a Summer 2027 cycle and a posting
+  // from June is still open. A one-week window hid most of the live market.
+  sinceDays: 90,
+  ats: [...DEFAULT_ATS_SOURCES],
   limitPerAts: 150,
 };
 
