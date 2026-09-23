@@ -245,6 +245,7 @@ const SYSTEM_PATHS = [
   'lib/bullets.mjs',
   'lib/discovered.mjs',
   'lib/evidence.mjs',
+  'lib/eligibility.mjs',
   'lib/xlsx.mjs',
   'lib/tex-sections.mjs',
   'compose-resume.mjs',
