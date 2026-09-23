@@ -22,11 +22,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import * as yaml from 'js-yaml';
+import { execFileSync } from 'node:child_process';
 import { getCareerOpsRoot } from './path-resolver.mjs';
 import { isMainModule } from './lib/is-main-module.mjs';
 import { validateLibrary, selectBullets } from './lib/bullets.mjs';
 import { covers } from './lib/tailor.mjs';
 import { parseRow, isEarlyCareer } from './pretriage.mjs';
+import { eligibility } from './lib/eligibility.mjs';
 
 const ROOT = getCareerOpsRoot();
 const arg = (n, d = null) => {
@@ -108,6 +110,7 @@ function main() {
   node target-list.mjs --near chicago       # one metro
   node target-list.mjs --top 100
   node target-list.mjs --tier1              # only the names that carry weight
+  node target-list.mjs --check-eligibility   # read each JD and drop confirmed mismatches
   node target-list.mjs --out data/targets.md`);
     return;
   }
@@ -121,6 +124,13 @@ function main() {
     .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
   const top = Number(arg('--top', '60')) || 60;
   const tier1Only = flag('--tier1');
+  // Checking eligibility means fetching each JD, so it is opt-in and bounded.
+  // Without it the list is a shortlist; with it, it is a list you can work.
+  const checkEligible = flag('--check-eligibility');
+  const profile = (() => {
+    try { return yaml.load(fs.readFileSync(path.join(ROOT, 'config/profile.yml'), 'utf8')) ?? {}; }
+    catch { return {}; }
+  })();
 
   const rows = fs.readFileSync(path.join(ROOT, 'data/pipeline.md'), 'utf8')
     .split('\n').map((l, i) => parseRow(l, i)).filter(Boolean).filter((r) => !r.done);
@@ -135,6 +145,12 @@ function main() {
     if (!localish) continue;
     if (/\b(uk|united kingdom|canada|india|emea|apac|colombia|mexico|brazil|singapore|japan|australia|germany|poland)\b/i.test(loc)
         && !/\b(chicago|illinois|tucson|phoenix|arizona|united states|usa)\b/i.test(loc)) continue;
+
+    // A title naming a degree level rules a posting out without any JD at all:
+    // "Data Scientist Research Intern - PhD" is not ambiguous.
+    const levels = (profile.degrees ?? []).map((d) => String(d.level ?? '').toLowerCase());
+    if (/\b(phd|ph\.d|doctoral)\b/i.test(r.title) && !levels.includes('phd')) continue;
+    if (/\bmba\b/i.test(r.title) && !levels.includes('mba')) continue;
 
     const fit = bestFit(r.title, archetypes);
     if (!fit) continue;
@@ -154,7 +170,33 @@ function main() {
     });
   }
   scored.sort((a, b) => b.rank - a.rank);
-  const list = scored.slice(0, top);
+  let list = scored.slice(0, top);
+
+  if (checkEligible) {
+    if (!profile.degrees?.length) {
+      console.error('--check-eligibility needs a `degrees:` block in config/profile.yml.');
+      process.exit(1);
+    }
+    const code = path.dirname(new URL(import.meta.url).pathname);
+    let checked = 0, dropped = 0;
+    for (const r of list) {
+      let jd = '';
+      try {
+        jd = execFileSync(process.execPath, [path.join(code, 'fetch-jd.mjs'), r.url],
+          { encoding: 'utf8', timeout: 45000, stdio: ['ignore', 'pipe', 'ignore'] });
+      } catch { /* no API for this ATS; stays unknown and passes */ }
+      if (!jd) { r.eligible = 'no-jd'; continue; }
+      checked++;
+      const e = eligibility(jd, profile);
+      r.eligible = e.verdict;
+      r.eligibleWhy = e.reason;
+      if (e.verdict === 'ineligible') dropped++;
+    }
+    console.error(`eligibility: ${checked} JDs read, ${dropped} ruled out, ${list.length - checked} had no readable JD`);
+    // A confirmed mismatch is removed; unknown and no-jd stay, because silence
+    // about a requirement is not evidence of failing it.
+    list = list.filter((r) => r.eligible !== 'ineligible');
+  }
 
   const lines = [
     `# Target list — ${new Date().toISOString().slice(0, 10)}`,
@@ -166,12 +208,15 @@ function main() {
     '`fit` is how many of its terms the title hits; `±` is the margin over the runner-up, so a',
     'small margin means two resumes are about equally good and positioning is your call.',
     '',
-    '| # | Company | Role | Where | Resume | fit | ± | Link |',
-    '|---|---|---|---|---|---|---|---|',
+    ...(checkEligible ? ['`elig` — ✓ the posting\'s stated graduation window fits one of your degrees; `?` it names none.',
+      'Rows whose window CONFIRMS a mismatch are removed, not shown.', ''] : []),
+    `| # | Company | Role | Where | Resume | fit | ± |${checkEligible ? ' elig |' : ''} Link |`,
+    `|---|---|---|---|---|---|---|${checkEligible ? '---|' : ''}---|`,
   ];
   list.forEach((r, i) => {
     lines.push(`| ${i + 1}${r.tier1 ? ' ★' : ''} | ${r.company} | ${r.title.replace(/\|/g, '/')} `
-      + `| ${r.location.slice(0, 30).replace(/\|/g, '/')} | ${r.resume} | ${r.score} | ${r.margin} | ${r.url} |`);
+      + `| ${r.location.slice(0, 30).replace(/\|/g, '/')} | ${r.resume} | ${r.score} | ${r.margin} `
+      + `|${checkEligible ? ` ${r.eligible === 'eligible' ? '✓' : '?'} |` : ''} ${r.url} |`);
   });
   lines.push('', '★ = a name that carries weight on its own.', '',
     'Compose the named resume for any row with:',

@@ -27,20 +27,17 @@ the tree is clean and the suite is green except one environmental failure (see b
   board on a separate-root profile report `no-provider`.
 - Built Marilyn a `portals.yml` from her own trawl data: 14 of 16 boards live, first scan
   returns 106 matches. Her search is unblocked.
+- `lib/eligibility.mjs` — the graduation-window gate. Only a CONFIRMED mismatch rejects; a
+  posting naming no window passes as unknown. Degree fields are deliberately loose, so the
+  AI-for-Business MS claims CS, MIS, information systems, data science and "related field".
+  Tested against the real postings that fooled us: CIBC, Medline, The Hartford, Northern
+  Trust, Motorola, BCG.
+- `target-list.mjs` — ranks the pipeline against ALL eight resumes and says which to send.
+  `--check-eligibility` reads each JD and drops confirmed mismatches.
 
 ## Left to do, roughly in order
 
-1. **A graduation-window gate.** The highest-value filter left, and the finding
-   from actually running the pipeline. Most Summer 2027 JDs state a required
-   graduation window, it is a hard yes/no rather than a score, and nothing checks
-   it. On one day's Chicago listings: Northern Trust wants Dec 2027 - Summer 2028
-   (MS fits), Motorola wants "on or after December 2027" (fits), CIBC wants Dec
-   2026 - Jun 2027 (BA six months early, MS six months late - a genuine SKIP that
-   looked like a target until the JD was read). The window does not correlate
-   with company, location or title. Needs a `graduation_window` block in
-   portals.yml and a JD-text check, since it cannot be known from a listing row.
-
-2. **Scan cadence.** The discovered ledger only means anything across runs; every count in it
+1. **Scan cadence.** The discovered ledger only means anything across runs; every count in it
    is still from a single run. `node scan-simplify.mjs --since 7` every three days is
    zero-token. Not installed — say the word and it becomes a launchd job.
 
