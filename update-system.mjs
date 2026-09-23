@@ -250,6 +250,7 @@ const SYSTEM_PATHS = [
   'compose-resume.mjs',
   'profile-bundle.mjs',
   'pretriage.mjs',
+  'target-list.mjs',
   'tailor.mjs',
   'lib/tailor.mjs',
   'scripts/career-ops-dev.sh',
