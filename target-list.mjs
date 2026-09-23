@@ -140,8 +140,11 @@ function main() {
   for (const r of rows) {
     if (!isEarlyCareer(r.title)) continue;
     const loc = r.location.toLowerCase();
-    // Somewhere he can actually be. Remote only counts when it says US.
-    const localish = near.some((n) => loc.includes(n));
+    // Word boundaries, not substrings. `--near ", IL "` is trimmed to "il",
+    // which as a substring matches Philadelphia, Wilmington and Huntsville --
+    // a Chicago-only list came back with three states in it. `covers()` is the
+    // same boundary check the tailor uses on keywords.
+    const localish = near.some((n) => covers(loc, n));
     if (!localish) continue;
     if (/\b(uk|united kingdom|canada|india|emea|apac|colombia|mexico|brazil|singapore|japan|australia|germany|poland)\b/i.test(loc)
         && !/\b(chicago|illinois|tucson|phoenix|arizona|united states|usa)\b/i.test(loc)) continue;

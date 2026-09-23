@@ -256,6 +256,7 @@ const SYSTEM_PATHS = [
   'target-list.mjs',
   'tailor.mjs',
   'lib/tailor.mjs',
+  'scripts/apply-run.mjs',
   'scripts/career-ops-dev.sh',
   'scripts/seed-bullets.mjs',
   'scripts/check-syntax.mjs',
