@@ -66,23 +66,31 @@ const TIER1 = /^(google|alphabet|apple|amazon|meta|microsoft|netflix|nvidia|open
  * is a targeting decision, not something derivable from the bullets.
  */
 export const ROLE_WORDS = {
-  swe: ['software engineer', 'software developer', 'software engineering', 'backend', 'back end',
-    'frontend', 'front end', 'full stack', 'fullstack', 'application developer', 'systems engineer',
-    'platform engineer', 'developer', 'programmer', 'android', 'ios', 'mobile'],
+  swe: ['software engineer', 'software developer', 'software development', 'software dev',
+    'software engineering', 'backend', 'back end', 'frontend', 'front end', 'full stack', 'fullstack',
+    'application developer', 'application engineer', 'application software', 'systems engineer',
+    'platform engineer', 'developer', 'programmer', 'android', 'ios', 'mobile', 'web developer',
+    'test engineer', 'test engineering', 'qa engineer', 'quality engineering', 'sdet',
+    'automation engineer', 'computer science'],
   ai_engineer: ['ai engineer', 'machine learning', 'ml engineer', 'applied ai', 'applied ml',
     'applied scientist', 'generative ai', 'genai', 'nlp', 'ai/ml', 'deep learning', 'llm',
-    'research engineer', 'ai research', 'artificial intelligence'],
+    'research engineer', 'ai research', 'artificial intelligence', 'computer vision',
+    'ai development', 'ai developer', 'data mining'],
   data_engineer: ['data engineer', 'data engineering', 'analytics engineer', 'etl', 'data platform',
-    'data pipeline', 'data infrastructure', 'big data', 'data warehouse'],
+    'data pipeline', 'data infrastructure', 'big data', 'data warehouse', 'database',
+    'data analyst', 'data analytics', 'analytics', 'business intelligence', 'data office',
+    'data management', 'data quality'],
   solutions_architect: ['solutions architect', 'solution architect', 'cloud architect', 'devops',
     'site reliability', 'sre', 'infrastructure engineer', 'platform', 'cloud engineer',
     'technical account', 'presales', 'pre-sales'],
   pm_tech_lead: ['product manager', 'product management', 'program manager', 'technical program',
-    'technical product', 'associate product', 'apm', 'product intern', 'product analyst'],
+    'technical product', 'associate product', 'apm', 'product intern', 'product analyst',
+    'product owner'],
   tech_consultant: ['consultant', 'consulting', 'technology analyst', 'business technology',
-    'implementation', 'rotational', 'technical analyst', 'advisory'],
+    'implementation', 'rotational', 'technical analyst', 'advisory', 'business analyst',
+    'business insights', 'business systems', 'digital transformation'],
   research_ga: ['research', 'research assistant', 'research intern', 'scientist', 'quantitative',
-    'quant', 'data scientist', 'data science'],
+    'quant', 'data scientist', 'data science', 'statistics', 'statistical', 'model risk'],
   housing_ga: ['student services', 'residence', 'housing', 'student support', 'community director'],
 };
 
@@ -125,10 +133,22 @@ export function locationPasses(location, near) {
   return US_ANCHOR.test(loc) || pinned.some((n) => covers(loc, n));
 }
 
-/** Best-fitting resume for one posting title, and how clear the win is. */
+/**
+ * Best-fitting resume for one posting title, and how clear the win is.
+ *
+ * Matched against the title BOTH as written and with its hyphens and slashes
+ * flattened to spaces. `covers()` matches a multi-word phrase literally -- it
+ * has to, or keywords like "ci/cd" and "test-driven development" would break --
+ * so "full stack" in the table missed "Full-Stack Engineering Intern" entirely.
+ * Flattening only the title, never the keyword, keeps the punctuated keywords
+ * ("ai/ml", "pre-sales") working against the raw form.
+ */
 export function bestFit(title, archetypes) {
+  const raw = String(title ?? '');
+  const flat = raw.replace(/[-\u2013\u2014/]+/g, ' ');
+  const hit = (t) => covers(raw, t) || covers(flat, t);
   const scored = archetypes
-    .map((a) => ({ id: a.id, hits: a.vocabulary.filter((t) => covers(title, t)) }))
+    .map((a) => ({ id: a.id, hits: a.vocabulary.filter(hit) }))
     .map((a) => ({ ...a, n: a.hits.length }))
     .sort((a, b) => b.n - a.n);
   const top = scored[0];
