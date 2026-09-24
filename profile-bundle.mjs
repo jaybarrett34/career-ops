@@ -22,12 +22,26 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import * as yaml from 'js-yaml';
-import { getCareerOpsRoot } from './path-resolver.mjs';
 import { isMainModule } from './lib/is-main-module.mjs';
 import { isNestedCheckout } from './lib/mjs-files.mjs';
 
-const CHECKOUT = getCareerOpsRoot();
+/**
+ * The CODE checkout, which is NOT the data root.
+ *
+ * This was getCareerOpsRoot(), which returns the DATA root once CAREER_OPS_ROOT
+ * or .career-ops-data is set -- the state the web UI puts the process in when a
+ * profile is selected, and the state this script's own closing instructions tell
+ * the user to create on the far machine. Everything downstream then broke
+ * quietly: config/roots.yml was looked for in the data root, so resolveRoot fell
+ * into its catch and exported the DEFAULT root whatever --profile said; and
+ * collect()'s `root === CHECKOUT` test was trivially true, forcing the enumerated
+ * rule onto a standalone root -- the exact silent truncation PROFILE_PATHS
+ * documents. config/roots.yml and the source tree live with the code, so this
+ * resolves against the code.
+ */
+const CHECKOUT = path.dirname(fileURLToPath(import.meta.url));
 
 /**
  * What belongs to a PERSON when the root IS the code checkout.
@@ -181,7 +195,16 @@ function resolveRoot(id) {
   let reg;
   try {
     reg = yaml.load(fs.readFileSync(file, 'utf8'));
-  } catch {
+  } catch (e) {
+    // NO registry is a single-person install: the checkout is the only root.
+    // An UNREADABLE one is different -- swallowing a syntax error here turned
+    // `export --profile alice` into an export of the default root, written into
+    // a manifest stamped `id: alice`. Every other failure in this function
+    // exits; so does this one.
+    if (e.code !== 'ENOENT') {
+      console.error(`Could not read ${file}: ${e.message}`);
+      process.exit(1);
+    }
     return { root: CHECKOUT, label: 'this checkout', id: id || 'default' };
   }
   const roots = Array.isArray(reg?.roots) ? reg.roots : [];
@@ -229,7 +252,11 @@ function doExport() {
     exported_from: root,
     exported_at: new Date().toISOString().slice(0, 10),
     rule,
-    includes_third_party_pii: includePii && skippedPii.length > 0,
+    // skippedPii is only ever populated on the !includePii branch, so
+    // `includePii && skippedPii.length` was false on EVERY export -- including
+    // the --include-pii run that actually carries contacts.tsv and
+    // Connections.csv to another machine, where the claim matters most.
+    includes_third_party_pii: includePii && files.some((f) => PII_PATHS.has(f)),
     files,
   };
   fs.writeFileSync(path.join(outDir, MANIFEST), yaml.dump(manifest, { lineWidth: 100, noRefs: true }));

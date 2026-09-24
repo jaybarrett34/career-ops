@@ -10,6 +10,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { localToday } from '../lib/local-today.mjs';
 
 const arg = (n, d = null) => {
   const i = process.argv.indexOf(n);
@@ -45,11 +46,34 @@ const src = arg('--in', 'data/targets.md');
 const out = arg('--out', 'data/apply-run.md');
 const title = arg('--title', 'Apply run');
 
-const rows = fs.readFileSync(path.resolve(src), 'utf8').split('\n')
+const srcLines = fs.readFileSync(path.resolve(src), 'utf8').split('\n');
+
+// Columns are resolved by HEADER NAME, not by position. target-list.mjs emits an
+// `elig` column only under --check-eligibility, so a fixed index read the URL
+// one cell left on a list built without it -- every row came back with no URL,
+// was filtered out, and the run sheet printed "0 roles" over a full list.
+const header = srcLines.find((l) => /^\|\s*#\s*\|/.test(l));
+const cols = {};
+if (header) {
+  header.split('|').map((s) => s.trim().toLowerCase()).forEach((h, i) => { if (h && !(h in cols)) cols[h] = i; });
+}
+const at = (c, name, fallback) => {
+  const i = cols[name];
+  return i != null ? (c[i] ?? '') : (fallback != null ? (c[fallback] ?? '') : '');
+};
+
+const rows = srcLines
   .filter((l) => /^\| \d+/.test(l))
   .map((l) => {
     const c = l.split('|').map((s) => s.trim());
-    return { company: c[2], role: c[3], location: c[4], resume: c[5], elig: c[8], url: c[9] };
+    return {
+      company: at(c, 'company', 2),
+      role: at(c, 'role', 3),
+      location: at(c, 'where', 4),
+      resume: at(c, 'resume', 5),
+      elig: at(c, 'elig'),
+      url: at(c, 'link', c.length - 2),
+    };
   })
   .filter((r) => r.url && !HFT.test(r.company));
 
@@ -62,7 +86,9 @@ for (const r of rows) {
 const ordered = [...groups].sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]));
 
 const lines = [
-  `# ${title} — ${new Date().toISOString().slice(0, 10)}`,
+  // localToday, not toISOString: an evening run west of UTC headed the sheet
+  // with tomorrow's date.
+  `# ${title} — ${localToday()}`,
   '',
   `${rows.length} roles, grouped by ATS tenant. One account covers every role under a`,
   'heading, so working a group straight through pays the signup once rather than once',

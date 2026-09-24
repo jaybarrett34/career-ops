@@ -19,14 +19,18 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { getCareerOpsRoot, resolveTrackerPath } from './path-resolver.mjs';
 import { isMainModule } from './lib/is-main-module.mjs';
 import { buildXlsx } from './lib/xlsx.mjs';
 import { readXlsx, rowsToObjects } from './lib/xlsx-read.mjs';
 import { resolveColumns, parseTrackerRow } from './tracker-parse.mjs';
+import { localToday } from './lib/local-today.mjs';
 
 const ROOT = getCareerOpsRoot();
-const CODE = path.dirname(new URL(import.meta.url).pathname);
+// fileURLToPath, not .pathname: a checkout under "My Projects" comes back as
+// "My%20Projects" and every spawn below ENOENTs.
+const CODE = path.dirname(fileURLToPath(import.meta.url));
 const arg = (n, d = null) => {
   const i = process.argv.indexOf(n);
   return i >= 0 && process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[i + 1] : d;
@@ -68,7 +72,7 @@ function readTracker() {
 
 function doExport() {
   const { rows } = readTracker();
-  const date = new Date().toISOString().slice(0, 10);
+  const date = localToday();
 
   const pipelineFile = path.join(ROOT, 'data/pipeline.md');
   const pipeline = fs.existsSync(pipelineFile)
@@ -161,7 +165,7 @@ function doImport() {
 
   let ok = 0;
   for (const c of changes) {
-    let out = '';
+    let out = '', failed = false;
     try {
       // --row, not a bare number: a bare selector is ambiguous between a tracker
       // row and a report ID, and set-status refuses rather than guessing. We are
@@ -171,12 +175,14 @@ function doImport() {
       { encoding: 'utf8', stdio: 'pipe' });
     } catch (e) {
       out = String(e.stdout || e.stderr || e.message);
+      failed = true;
     }
-    // set-status EXITS 0 when it refuses -- a guard answered is not a crash --
-    // so the exit code alone reported failures as successes. The output is what
-    // says whether anything was written.
-    if (/^\s*❌/m.test(out) || /\bRefus/i.test(out)) {
-      console.error(`  #${c.num}: ${out.trim().split('\n')[0]}`);
+    // BOTH signals are needed. A non-zero exit covers the crash and spawn-failure
+    // cases, where stderr is a stack trace carrying neither marker below -- those
+    // were counted as writes. The text covers a refusal that still exits 0,
+    // because a guard answering is not a crash.
+    if (failed || /^\s*❌/m.test(out) || /\bRefus/i.test(out)) {
+      console.error(`  #${c.num}: ${out.trim().split('\n')[0] || 'set-status.mjs failed'}`);
     } else {
       ok++;
     }

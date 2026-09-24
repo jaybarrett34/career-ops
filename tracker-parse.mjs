@@ -306,6 +306,9 @@ export function parseTrackerRow(line, colmap = LEGACY_COLMAP) {
   };
   if (colmap.location != null) row.location = at('location');
   if (colmap.via != null) row.via = at('via');
+  // resolveColumns already finds a URL column; not reading it here meant every
+  // consumer of a parsed row lost the deterministic dedup key.
+  if (colmap.url != null) row.url = at('url');
   return row;
 }
 

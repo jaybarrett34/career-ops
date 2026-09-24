@@ -19,7 +19,7 @@ test('our own writer round-trips', () => {
  * it would fail on every file that had actually been opened and saved — which
  * is every file worth importing.
  */
-function excelStyleXlsx(headerAndRows) {
+function excelStyleXlsx(headerAndRows, { target = 'worksheets/sheet1.xml' } = {}) {
   const strings = [...new Set(headerAndRows.flat().filter((v) => v && isNaN(Number(v))))];
   const si = strings.map((s) => `<si><t>${s.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</t></si>`).join('');
   const col = (n) => String.fromCharCode(65 + n);
@@ -37,7 +37,7 @@ function excelStyleXlsx(headerAndRows) {
     ['[Content_Types].xml', '<?xml version="1.0"?><Types/>'],
     ['_rels/.rels', '<?xml version="1.0"?><Relationships/>'],
     ['xl/workbook.xml', '<?xml version="1.0"?><workbook xmlns:r="r"><sheets><sheet name="Sheet One" sheetId="1" r:id="rId1"/></sheets></workbook>'],
-    ['xl/_rels/workbook.xml.rels', '<?xml version="1.0"?><Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>'],
+    ['xl/_rels/workbook.xml.rels', `<?xml version="1.0"?><Relationships><Relationship Id="rId1" Target="${target}"/></Relationships>`],
     ['xl/sharedStrings.xml', `<?xml version="1.0"?><sst count="${strings.length}">${si}</sst>`],
     ['xl/worksheets/sheet1.xml', sheet],
   ];
@@ -132,4 +132,34 @@ test('an ambiguous company+role match is refused rather than guessed', () => {
     { num: 2, company: 'Acme', role: 'SWE Intern', status: 'Applied' },
   ];
   assert.equal(matchRow({ Company: 'Acme', Role: 'SWE Intern' }, tracker), null);
+});
+
+test('a self-closing <c/> does not shift the rest of the row left', () => {
+  // `[^>]*` in the paired alternative eats the `/` of `<c r="B1" s="2"/>`, and
+  // alternation is left-biased, so that branch won and swallowed the NEXT cell --
+  // reporting its value at the empty cell's column. Excel emits a self-closing
+  // <c> for any formatted-but-blank cell, so a blank Score put the PDF value
+  // under Status on import.
+  assert.deepEqual(
+    sheetRows('<row><c r="A1"><v>1</v></c><c r="B1" s="2"/><c r="C1"><v>3</v></c></row>', []),
+    [['1', '', '3']],
+  );
+  assert.deepEqual(
+    sheetRows('<row><c r="A1" s="2" /><c r="B1"><v>9</v></c></row>', []),
+    [['', '9']],
+  );
+});
+
+test('an absolute relationship Target resolves without doubling the xl/ prefix', () => {
+  // Target="/xl/worksheets/sheet1.xml" is legal OPC and some producers emit it.
+  // Testing the prefix BEFORE stripping the slash produced
+  // xl/xl/worksheets/sheet1.xml, the lookup missed, and the sheet was dropped --
+  // after which the unnamed fallback scan returned it as
+  // "xl/worksheets/sheet1.xml", which no longer matches workbook.mjs's /tracker/i.
+  const buf = excelStyleXlsx([['Company', 'Status'], ['Acme', 'Applied']],
+    { target: '/xl/worksheets/sheet1.xml' });
+  const sheets = readXlsx(buf);
+  assert.equal(sheets.length, 1);
+  assert.equal(sheets[0].name, 'Sheet One', 'the sheet keeps its workbook.xml name');
+  assert.deepEqual(sheets[0].rows[1], ['Acme', 'Applied']);
 });

@@ -94,3 +94,51 @@ test('checkLevel does not fire when a posting welcomes graduate students too', (
   const jd = 'open to rising seniors and graduate students pursuing a master\'s degree';
   assert.equal(checkLevel(jd, PROFILE.degrees).verdict, 'unknown');
 });
+
+// ---------------------------------------------------------------------------
+// Regressions from the 2026-09-23 review. Each of these was a PERMANENT false
+// rejection -- the one failure mode this module's header says must never happen.
+
+test('"BS, MS, or PhD" is not read as PhD-only', () => {
+  // The most common degree line in tech spells neither "bachelor's" nor
+  // "master's", so a negative lookaside built from those two words classified it
+  // PhD-only and target-list --check-eligibility deleted the row.
+  for (const jd of ['BS, MS, or PhD in Computer Science or related field.',
+    'Pursuing a BS/MS/PhD degree.',
+    'B.S. or Ph.D. in a technical field.',
+    'Bachelors, Masters or PhD candidates welcome.']) {
+    assert.equal(eligibility(jd, PROFILE).verdict, 'unknown', jd);
+  }
+});
+
+test('a posting that really is PhD-only still rejects', () => {
+  const jd = 'Currently enrolled in a Ph.D. program. PhD candidates only.';
+  assert.equal(eligibility(jd, PROFILE).verdict, 'ineligible');
+});
+
+test('a bare year on the POSTING side spans the whole year', () => {
+  // "graduating in 2027" collapsed to June 2027, so a December 2027 graduate was
+  // rejected by a posting that wanted exactly them.
+  const dec = { degrees: [{ label: 'MS', field: 'cs', level: 'masters', graduates: 'December 2027' }] };
+  const jan = { degrees: [{ label: 'MS', field: 'cs', level: 'masters', graduates: 'January 2027' }] };
+  assert.equal(eligibility('Must be graduating in 2027.', dec).verdict, 'eligible');
+  assert.equal(eligibility('Must be graduating in 2027.', jan).verdict, 'eligible');
+  assert.equal(eligibility('Must be graduating in 2027.',
+    { degrees: [{ label: 'MS', field: 'cs', graduates: 'May 2029' }] }).verdict, 'ineligible');
+});
+
+test('a bare year on the CANDIDATE side still reads as mid-year', () => {
+  // The widening belongs to the posting's edges only; for the candidate's own
+  // date a single guess is all there is.
+  const p = { degrees: [{ label: 'MS', field: 'cs', graduates: '2027' }] };
+  assert.equal(checkGraduation('graduating between May 2027 and August 2027', p.degrees).verdict, 'eligible');
+});
+
+test('a profile with no parseable graduation date is unknown, not ineligible', () => {
+  // Falling through to the ineligible return dropped EVERY windowed posting for
+  // a profile whose degrees block merely omits a date.
+  const p = { degrees: [{ label: 'MS', field: 'ai for business', level: 'masters' }] };
+  const r = eligibility('graduating between December 2027 and Summer 2028', p);
+  assert.equal(r.verdict, 'unknown');
+  assert.ok(!/undefined/.test(r.reason), 'the reason should not print "undefined"');
+});

@@ -23,12 +23,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import * as yaml from 'js-yaml';
 import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { getCareerOpsRoot } from './path-resolver.mjs';
 import { isMainModule } from './lib/is-main-module.mjs';
 import { validateLibrary, selectBullets } from './lib/bullets.mjs';
 import { covers } from './lib/tailor.mjs';
 import { parseRow, isEarlyCareer } from './pretriage.mjs';
 import { eligibility } from './lib/eligibility.mjs';
+import { localToday } from './lib/local-today.mjs';
 
 const ROOT = getCareerOpsRoot();
 const arg = (n, d = null) => {
@@ -43,8 +45,13 @@ const flag = (n) => process.argv.includes(n);
  * Not a quality judgement about the work — it is about SELECTIVITY and what a
  * line on a resume signals later. Kept as data rather than inferred from any
  * score, because there is no signal in a job posting that means "this is Apple".
+ *
+ * The trailing `(?![A-Za-z])` is load-bearing. Anchored at `^` with no boundary,
+ * short alternatives matched name PREFIXES: Intelligent Medical Objects (intel),
+ * Squarespace, Snapdocs, Blockdaemon, Eaton (ea), Amdocs (amd), Metabase. Each
+ * got the star, +25 rank and passed --tier1, outranking genuine matches.
  */
-const TIER1 = /^(google|alphabet|apple|amazon|meta|microsoft|netflix|nvidia|openai|anthropic|databricks|stripe|airbnb|uber|lyft|linkedin|salesforce|adobe|oracle|ibm|intel|amd|qualcomm|broadcom|tesla|spacex|palantir|snowflake|datadog|cloudflare|atlassian|shopify|square|block|coinbase|doordash|instacart|pinterest|snap|spotify|twilio|figma|notion|roblox|ea|electronic arts|activision|epic games|bloomberg|goldman sachs|morgan stanley|jpmorgan|jp morgan|j\.?p\.? morgan|capital one|american express|visa|mastercard|paypal|boeing|lockheed|raytheon|rtx|northrop|general dynamics|caterpillar|deere|3m|ge |general electric|honeywell|siemens|abbvie|abbott|pfizer|merck|johnson)/i;
+const TIER1 = /^(google|alphabet|apple|amazon|meta|microsoft|netflix|nvidia|openai|anthropic|databricks|stripe|airbnb|uber|lyft|linkedin|salesforce|adobe|oracle|ibm|intel|amd|qualcomm|broadcom|tesla|spacex|palantir|snowflake|datadog|cloudflare|atlassian|shopify|square|block|coinbase|doordash|instacart|pinterest|snap|spotify|twilio|figma|notion|roblox|ea|electronic arts|activision|epic games|bloomberg|goldman sachs|morgan stanley|jpmorgan|jp morgan|j\.?p\.? morgan|capital one|american express|visa|mastercard|paypal|boeing|lockheed|raytheon|rtx|northrop|general dynamics|caterpillar|deere|3m|ge|general electric|honeywell|siemens|abbvie|abbott|pfizer|merck|johnson)(?![A-Za-z])/i;
 
 /**
  * Role words each resume is FOR, which is a different thing from the
@@ -122,6 +129,8 @@ function main() {
 
   const near = String(arg('--near', 'chicago,illinois,denver,colorado,remote'))
     .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+  // Generic "this is domestic" tokens, kept alongside whatever --near asked for.
+  const usAnchor = /\b(united states|usa|u\.s\.a?|remote - us|us remote)\b/i;
   const top = Number(arg('--top', '60')) || 60;
   const tier1Only = flag('--tier1');
   // Checking eligibility means fetching each JD, so it is opt-in and bounded.
@@ -146,8 +155,12 @@ function main() {
     // same boundary check the tailor uses on keywords.
     const localish = near.some((n) => covers(loc, n));
     if (!localish) continue;
+    // A multi-location posting that names a foreign office is dropped only if
+    // nothing it names is somewhere you asked for. The rescue is DERIVED from
+    // --near rather than hardcoded: the old list was a copy of the default
+    // --near, so `--near toronto` dropped every row and printed an empty list.
     if (/\b(uk|united kingdom|canada|india|emea|apac|colombia|mexico|brazil|singapore|japan|australia|germany|poland)\b/i.test(loc)
-        && !/\b(chicago|illinois|denver|colorado|united states|usa)\b/i.test(loc)) continue;
+        && !usAnchor.test(loc) && !near.some((n) => covers(loc, n))) continue;
 
     // A title naming a degree level rules a posting out without any JD at all:
     // "Data Scientist Research Intern - PhD" is not ambiguous.
@@ -180,7 +193,7 @@ function main() {
       console.error('--check-eligibility needs a `degrees:` block in config/profile.yml.');
       process.exit(1);
     }
-    const code = path.dirname(new URL(import.meta.url).pathname);
+    const code = path.dirname(fileURLToPath(import.meta.url));
     let checked = 0, dropped = 0;
     for (const r of list) {
       let jd = '';
@@ -202,7 +215,7 @@ function main() {
   }
 
   const lines = [
-    `# Target list — ${new Date().toISOString().slice(0, 10)}`,
+    `# Target list — ${localToday()}`,
     '',
     `${rows.length} open rows → ${scored.length} early-career roles in your locations that match at least one of your`,
     `${archetypes.length} resumes → top ${list.length} below.`,
