@@ -142,3 +142,44 @@ test('a profile with no parseable graduation date is unknown, not ineligible', (
   assert.equal(r.verdict, 'unknown');
   assert.ok(!/undefined/.test(r.reason), 'the reason should not print "undefined"');
 });
+
+test('a floor written after the term is a floor, not a single date', () => {
+  // "Graduation date of August 2027 or beyond" fell through to the single-term
+  // branch and was read as August 2027 exactly, deleting a December 2027
+  // graduate -- four COUNTRY Financial rows on one Chicago list.
+  const dec27 = { degrees: [{ label: 'MS', field: 'cs', level: 'masters', graduates: 'December 2027' }] };
+  for (const jd of ['Graduation date of August 2027 or beyond',
+    'Graduating August 2027 and later',
+    'Graduation date of August 2027 onwards',
+    'Expected graduation August 2027 or after']) {
+    assert.equal(eligibility(jd, dec27).verdict, 'eligible', jd);
+  }
+  assert.equal(parseGraduationWindow('Graduation date of August 2027 or beyond').kind, 'floor');
+  assert.equal(parseGraduationWindow('Graduation date of August 2027 or beyond').to, null);
+});
+
+test('a ceiling written after the term is a ceiling', () => {
+  const w = parseGraduationWindow('Graduating May 2026 or earlier');
+  assert.equal(w.kind, 'ceiling');
+  assert.equal(w.from, null);
+});
+
+test('a PREFERRED graduation date does not reject', () => {
+  // "Be enrolled as a junior undergraduate (Preferred Graduation Date: Spring
+  // 2028)" was read as a hard May-2028-only window. Only a confirmed mismatch
+  // may reject, and a preference confirms nothing.
+  for (const jd of ['Preferred Graduation Date: Spring 2028',
+    'Ideally graduating in May 2028',
+    'Graduation in May 2028 preferred']) {
+    assert.equal(parseGraduationWindow(jd), null, jd);
+  }
+  // ...but the same sentence stated as a requirement still does.
+  assert.equal(eligibility('Expecting to graduate in May 2028.', PROFILE).verdict, 'ineligible');
+});
+
+test('a junior undergraduate posting is undergraduate-only however it is phrased', () => {
+  assert.equal(checkLevel('Be enrolled as a junior undergraduate', PROFILE.degrees).verdict, 'ineligible');
+  assert.equal(checkLevel('open to undergraduate sophomores', PROFILE.degrees).verdict, 'ineligible');
+  // Still not when graduate students are welcomed alongside.
+  assert.equal(checkLevel('junior undergraduate or graduate student', PROFILE.degrees).verdict, 'unknown');
+});

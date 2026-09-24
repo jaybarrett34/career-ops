@@ -98,6 +98,33 @@ export function archetypeVocabularies(library, resumes, root) {
   return out;
 }
 
+/**
+ * Is this posting's location somewhere the search is actually for?
+ *
+ * Two questions, not one. First, does it name anywhere you asked for -- by WORD
+ * boundary, because `--near ", IL "` trims to "il" and as a substring that
+ * matches Philadelphia, Wilmington and Huntsville. Second, if it names a foreign
+ * office, does it also name somewhere domestic or somewhere you pinned.
+ *
+ * "remote" is deliberately not allowed to answer the second question. It matches
+ * anywhere on earth, so "Remote - Canada" satisfies it while being exactly the
+ * row this drops, and it is in the default --near.
+ */
+const FOREIGN = /\b(uk|united kingdom|canada|india|emea|apac|colombia|mexico|brazil|singapore|japan|australia|germany|poland)\b/i;
+// `(?![A-Za-z])` rather than `\b`, which never matches after the `.` in "U.S.".
+const US_ANCHOR = /\b(united states|usa|u\.s\.a?|remote - us|us remote)(?![A-Za-z])/i;
+
+export function locationPasses(location, near) {
+  const loc = String(location ?? '').toLowerCase();
+  if (!near.some((n) => covers(loc, n))) return false;
+  if (!FOREIGN.test(loc)) return true;
+  // Derived from --near, not hardcoded: the old rescue list was a copy of the
+  // DEFAULT --near, so `--near toronto` dropped every row and printed an empty
+  // list with no explanation.
+  const pinned = near.filter((n) => !/^remote/.test(n));
+  return US_ANCHOR.test(loc) || pinned.some((n) => covers(loc, n));
+}
+
 /** Best-fitting resume for one posting title, and how clear the win is. */
 export function bestFit(title, archetypes) {
   const scored = archetypes
@@ -129,8 +156,6 @@ function main() {
 
   const near = String(arg('--near', 'chicago,illinois,denver,colorado,remote'))
     .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
-  // Generic "this is domestic" tokens, kept alongside whatever --near asked for.
-  const usAnchor = /\b(united states|usa|u\.s\.a?|remote - us|us remote)\b/i;
   const top = Number(arg('--top', '60')) || 60;
   const tier1Only = flag('--tier1');
   // Checking eligibility means fetching each JD, so it is opt-in and bounded.
@@ -148,19 +173,7 @@ function main() {
   const scored = [];
   for (const r of rows) {
     if (!isEarlyCareer(r.title)) continue;
-    const loc = r.location.toLowerCase();
-    // Word boundaries, not substrings. `--near ", IL "` is trimmed to "il",
-    // which as a substring matches Philadelphia, Wilmington and Huntsville --
-    // a Chicago-only list came back with three states in it. `covers()` is the
-    // same boundary check the tailor uses on keywords.
-    const localish = near.some((n) => covers(loc, n));
-    if (!localish) continue;
-    // A multi-location posting that names a foreign office is dropped only if
-    // nothing it names is somewhere you asked for. The rescue is DERIVED from
-    // --near rather than hardcoded: the old list was a copy of the default
-    // --near, so `--near toronto` dropped every row and printed an empty list.
-    if (/\b(uk|united kingdom|canada|india|emea|apac|colombia|mexico|brazil|singapore|japan|australia|germany|poland)\b/i.test(loc)
-        && !usAnchor.test(loc) && !near.some((n) => covers(loc, n))) continue;
+    if (!locationPasses(r.location, near)) continue;
 
     // A title naming a degree level rules a posting out without any JD at all:
     // "Data Scientist Research Intern - PhD" is not ambiguous.
