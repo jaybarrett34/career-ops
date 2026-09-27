@@ -177,7 +177,7 @@ against voice-dna.md (no em dashes, no negative parallelism) and a hit refuses.`
         company, role_title: role, date: localToday(),
         greeting: 'Dear Hiring Team,', opening: d.paragraphs[0],
         profile_intro: d.paragraphs[1], closing: d.paragraphs[2],
-        signature: d.name,
+        signature: 'Sincerely,',
       },
     }, null, 2));
     console.log(`payload -> ${payloadPath}`);
@@ -193,7 +193,9 @@ against voice-dna.md (no em dashes, no negative parallelism) and a hit refuses.`
       execFileSync(process.execPath,
         [path.join(code, 'generate-cover-letter.mjs'), '--payload', payloadPath, '--out', out],
         { stdio: 'inherit' });
-      // Reveal it SELECTED in Finder, so it is one drag from the upload field.
+      // Reveal it SELECTED in Finder, nothing more. Opening the PDF steals
+      // focus in the middle of an application session; having it highlighted is
+      // what makes it one drag into the upload field.
       try { execFileSync('open', ['-R', out]); } catch { /* not macOS */ }
       console.error(`\nPDF: ${out}`);
     } catch (e) {
