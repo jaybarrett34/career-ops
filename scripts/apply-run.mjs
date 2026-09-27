@@ -125,7 +125,7 @@ for (const [tenant, list] of ordered) {
   lines.push(`## ${tenant}  (${list.length})`, '');
   for (const r of list) {
     lines.push(`- [ ] **${n++}.** ${r.company} — ${r.role}${r.elig === '✓' ? '  ✓' : ''}`);
-    lines.push(`      \`Alex Doe — ${r.resume}.pdf\`  ·  ${r.location}`);
+    lines.push(`      \`Alex-Doe-${r.resume}.pdf\`  ·  ${r.location}`);
     lines.push(`      ${r.url}`);
   }
   lines.push('');
