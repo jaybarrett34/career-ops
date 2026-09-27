@@ -17,10 +17,32 @@ const arg = (n, d = null) => {
   return i >= 0 && process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[i + 1] : d;
 };
 
-// Ruled out by Alex: "no way Im good for trading" and C++-heavy. They match on
-// title and location, so they must be excluded by NAME or they dominate a
-// Chicago list.
-const HFT = /akuna|optiver|belvedere|jump trading|hudson river|imc|drw|citadel|jane street|old mission|chicago trading|transmarket|aquatic|peak6|wolverine|dv trading|geneva trading|cboe|xr trading|group one|headlands|tower research|five rings/i;
+// Alex ruled out TRADING, not the firms. Excluding by company name threw away
+// ~20 genuine engineering roles at Chicago's most selective employers -- DV
+// Trading's AI Engineer Intern, Geneva's AI and Data Engineer Interns, Citadel
+// and Jump and IMC and Hudson River SWE internships -- because the company was
+// on the list. Reinstated 2026-09-26 at his direction ("it's an ai engineer and
+// infra, might as well try for some of these").
+//
+// So the firm list below no longer excludes anything on its own. It marks a
+// company as a trading shop; what gets dropped is the ROLE.
+const HFT = /akuna|optiver|belvedere|jump ?trading|hudson ?river|imc|drw|citadel|jane ?street|old ?mission|chicago ?trading|transmarket|aquatic|peak6|wolverine|dv ?trading|geneva ?trading|cboe|xr ?trading|group ?one|headlands|tower ?research|five ?rings/i;
+
+// Company names arrive from two places -- a tracker row ("Chicago Trading Company")
+// and an ATS tenant slug ("chicagotradingcampus") -- and the slug has no spaces, so
+// a pattern written with them matched the first and missed the second. Tested
+// against BOTH the raw name and a despaced copy. Same class of bug as "full stack"
+// missing "Full-Stack" in target-list.
+const isHft = (name) => HFT.test(String(name ?? '')) || HFT.test(String(name ?? '').replace(/[^a-z0-9]+/gi, ''));
+
+// The desk itself, and the two things he named separately: quant research and
+// C++-heavy work. "C++ or Python" is NOT C++-heavy, so the exclusion requires
+// C++ without Python beside it.
+const DESK_ROLE = /\bquant|\btrader\b|trading analyst|\bfpga\b|hardware engineer/i;
+const CPP_HEAVY = (t) => /\bc\+\+/i.test(t) && !/python/i.test(t);
+
+// A trading firm's engineering roles stay; its desk roles go.
+const excluded = (row) => isHft(row.company) && (DESK_ROLE.test(row.role) || CPP_HEAVY(row.role));
 
 function tenantOf(row) {
   const u = row.url;
@@ -75,7 +97,7 @@ const rows = srcLines
       url: at(c, 'link', c.length - 2),
     };
   })
-  .filter((r) => r.url && !HFT.test(r.company));
+  .filter((r) => r.url && !excluded(r));
 
 const groups = new Map();
 for (const r of rows) {
