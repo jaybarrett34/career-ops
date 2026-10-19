@@ -174,17 +174,19 @@ function main() {
   const archetypes = archetypeVocabularies(library, resumes, ROOT);
   if (!archetypes.length) { console.error('No resumes in config/resumes.yml.'); process.exit(1); }
 
-  const near = String(arg('--near', 'chicago,illinois,denver,colorado,remote'))
+  const profile = (() => {
+    try { return yaml.load(fs.readFileSync(path.join(ROOT, 'config/profile.yml'), 'utf8')) ?? {}; }
+    catch { return {}; }
+  })();
+  // Where you search is yours, so the default lives in config/profile.yml
+  // (location.near), not here.
+  const near = String(arg('--near', (profile.location?.near ?? ['remote']).join(',')))
     .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
   const top = Number(arg('--top', '60')) || 60;
   const tier1Only = flag('--tier1');
   // Checking eligibility means fetching each JD, so it is opt-in and bounded.
   // Without it the list is a shortlist; with it, it is a list you can work.
   const checkEligible = flag('--check-eligibility');
-  const profile = (() => {
-    try { return yaml.load(fs.readFileSync(path.join(ROOT, 'config/profile.yml'), 'utf8')) ?? {}; }
-    catch { return {}; }
-  })();
 
   const rows = fs.readFileSync(path.join(ROOT, 'data/pipeline.md'), 'utf8')
     .split('\n').map((l, i) => parseRow(l, i)).filter(Boolean).filter((r) => !r.done);

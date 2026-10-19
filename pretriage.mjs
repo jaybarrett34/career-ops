@@ -32,6 +32,14 @@ import { buildTitleFilter, buildLocationFilter, loadBlacklist, atomicWriteFile, 
 import { normalizeCompany } from './tracker-utils.mjs';
 import { companyKey } from './lib/discovered.mjs';
 import { isMainModule } from './lib/is-main-module.mjs';
+import { getCareerOpsRoot } from './path-resolver.mjs';
+
+function profileNear() {
+  try {
+    const p = yaml.load(fs.readFileSync(path.join(getCareerOpsRoot(), 'config/profile.yml'), 'utf8'));
+    return Array.isArray(p?.location?.near) && p.location.near.length ? p.location.near : ['remote'];
+  } catch { return ['remote']; }
+}
 
 const arg = (n, d = null) => {
   const i = process.argv.indexOf(n);
@@ -202,7 +210,9 @@ reconsider it. Rows you checked off by hand are never touched.`);
 
   const keep = Number(arg('--keep', '200')) || 200;
   const reopen = flag('--reopen');
-  const near = String(arg('--near', 'chicago,illinois,denver,colorado,remote'))
+  // Where you search is yours, so the default lives in config/profile.yml
+  // (location.near), not here.
+  const near = String(arg('--near', profileNear().join(',')))
     .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
   const dryRun = flag('--dry-run');
   const termArg = arg('--term');

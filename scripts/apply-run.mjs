@@ -10,6 +10,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import * as yaml from 'js-yaml';
 import { localToday } from '../lib/local-today.mjs';
 
 const arg = (n, d = null) => {
@@ -69,6 +70,13 @@ const out = arg('--out', 'data/apply-run.md');
 const title = arg('--title', 'Apply run');
 
 const srcLines = fs.readFileSync(path.resolve(src), 'utf8').split('\n');
+// The PDFs are named after you, so the prefix comes from config/profile.yml.
+const prefix = (() => {
+  try {
+    const name = yaml.load(fs.readFileSync(path.resolve('config/profile.yml'), 'utf8'))?.candidate?.full_name;
+    return name ? `${name.trim().replace(/\s+/g, '-')}-` : '';
+  } catch { return ''; }
+})();
 
 // Columns are resolved by HEADER NAME, not by position. target-list.mjs emits an
 // `elig` column only under --check-eligibility, so a fixed index read the URL
@@ -125,7 +133,7 @@ for (const [tenant, list] of ordered) {
   lines.push(`## ${tenant}  (${list.length})`, '');
   for (const r of list) {
     lines.push(`- [ ] **${n++}.** ${r.company} — ${r.role}${r.elig === '✓' ? '  ✓' : ''}`);
-    lines.push(`      \`Alex-Doe-${r.resume}.pdf\`  ·  ${r.location}`);
+    lines.push(`      \`${prefix}${r.resume}.pdf\`  ·  ${r.location}`);
     lines.push(`      ${r.url}`);
   }
   lines.push('');

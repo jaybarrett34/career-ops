@@ -75,6 +75,8 @@ compensation:
 
 location:
   country: "United States"
+  # Optional default --near for pretriage.mjs and target-list.mjs.
+  # near: [seattle, washington, remote]
   city: "San Francisco"
   timezone: "PST"
   visa_status: "No sponsorship needed"
@@ -320,3 +322,10 @@ cover_letter:
 #     cross_role_bucket: "all_EM_roles"
 #     applied_to: ["Senior Software Engineer"]
 #     last_apply_date: "2026-01-01"
+
+# Optional. Read by cover-draft.mjs; a missing key drops its sentence.
+# cover:
+#   current_org: "Acme"
+#   current_role: "a software engineer on Acme's platform team"
+#   education: "I finished a BS in computer science at State University in May 2026."
+#   preferred_email_domain: "school.example"
